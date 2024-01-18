@@ -1,3 +1,9 @@
+# SCAD MLIR Backend 
+
+MLIR Dialect for scad. 
+
+Will support ScadTLCIR -> SCAD MLIR Dialect -> LLVM IR lowering .
+
 
 To make: 
 
