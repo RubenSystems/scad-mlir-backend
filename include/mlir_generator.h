@@ -23,7 +23,7 @@
 mlir::Value generate_mlir_constant(mlir::MLIRContext &context, mlir::ModuleOp & mod, mlir::OpBuilder & builder) {
 
 	mlir::Location location = mlir::FileLineColLoc::get(&context, std::string("jeef"), 100, 100);
-	return builder.create<mlir::scad::RegisterOp>(location, 10);
+	return builder.create<mlir::scad::VectorOp>(location, 10);
 }
 
 mlir::OwningOpRef<mlir::ModuleOp> generate_mlir(mlir::MLIRContext &context) {

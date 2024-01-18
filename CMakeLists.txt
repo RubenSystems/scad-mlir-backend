@@ -45,17 +45,26 @@ add_subdirectory(include)
 add_llvm_executable(scadc  
 	scadc.cpp
 	src/Dialect.cpp
-
+	src/affine_lowering.cpp
 DEPENDS
 	ScadOpsIncGen
 )
 
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
+
 target_link_libraries(scadc
 	PRIVATE
+		${dialect_libs}
+		${extension_libs}
 		MLIRAnalysis
+		MLIRCallInterfaces
+		MLIRCastInterfaces
 		MLIRFunctionInterfaces
 		MLIRIR
 		MLIRParser
+		MLIRPass
 		MLIRSideEffectInterfaces
+		MLIRSupport
 		MLIRTransforms
 )

@@ -29,13 +29,13 @@ void SCADDialect::initialize() {
       >();
 }
 
-void RegisterOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, int32_t value) {
+void VectorOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, int32_t value) {
   auto dataType = RankedTensorType::get({}, builder.getI32Type());
   auto dataAttribute = DenseIntElementsAttr::get(dataType, value);
-  RegisterOp::build(builder, state, dataType, dataAttribute);
+  VectorOp::build(builder, state, dataType, dataAttribute);
 }
 
-mlir::ParseResult RegisterOp::parse(mlir::OpAsmParser &parser, mlir::OperationState &result) {
+mlir::ParseResult VectorOp::parse(mlir::OpAsmParser &parser, mlir::OperationState &result) {
   mlir::DenseElementsAttr value;
   if (parser.parseOptionalAttrDict(result.attributes) ||
       parser.parseAttribute(value, "value", result.attributes))
@@ -45,13 +45,13 @@ mlir::ParseResult RegisterOp::parse(mlir::OpAsmParser &parser, mlir::OperationSt
   return success();
 }
 
-void RegisterOp::print(mlir::OpAsmPrinter &printer) {
+void VectorOp::print(mlir::OpAsmPrinter &printer) {
   printer << " ";
   printer.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"value"});
   printer << getValue();
 }
 
-mlir::LogicalResult RegisterOp::verify() {
+mlir::LogicalResult VectorOp::verify() {
   return mlir::success();
 }
 

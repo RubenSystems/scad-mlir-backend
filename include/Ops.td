@@ -15,9 +15,9 @@ def SCAD_Dialect : Dialect {
 class Scad_Op<string mnemonic, list<Trait> traits = []> :
     Op<SCAD_Dialect, mnemonic, traits>;
 
-def RegisterOp : Scad_Op<"register", [Pure]> {
+def VectorOp : Scad_Op<"vector", [Pure]> {
 
-  let summary = "register";
+  let summary = "vector";
 
   let arguments = (ins I32ElementsAttr:$value);
   let results = (outs I32Tensor);
