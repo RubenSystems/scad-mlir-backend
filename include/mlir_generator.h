@@ -20,15 +20,22 @@
 
 #include "Dialect.h"
 
-mlir::Value generate_mlir_constant(mlir::MLIRContext &context, mlir::ModuleOp & mod, mlir::OpBuilder & builder) {
-
-	mlir::Location location = mlir::FileLineColLoc::get(&context, std::string("jeef"), 100, 100);
+mlir::Value generate_mlir_constant(
+	mlir::MLIRContext & context,
+	mlir::ModuleOp & mod,
+	mlir::OpBuilder & builder
+) {
+	mlir::Location location = mlir::FileLineColLoc::get(
+		&context, std::string("jeef"), 100, 100
+	);
 	return builder.create<mlir::scad::VectorOp>(location, 10);
 }
 
-mlir::OwningOpRef<mlir::ModuleOp> generate_mlir(mlir::MLIRContext &context) {
-	mlir::OpBuilder builder(&context);
-	mlir::ModuleOp mod = mlir::ModuleOp::create(builder.getUnknownLoc());
+mlir::OwningOpRef<mlir::ModuleOp> generate_mlir(
+	mlir::OpBuilder & builder,
+	mlir::ModuleOp & mod,
+	mlir::MLIRContext & context
+) {
 	builder.setInsertionPointToEnd(mod.getBody());
 	generate_mlir_constant(context, mod, builder);
 

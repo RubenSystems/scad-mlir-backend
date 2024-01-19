@@ -17,7 +17,7 @@ class Scad_Op<string mnemonic, list<Trait> traits = []> :
 
 def VectorOp : Scad_Op<"vector", [Pure]> {
 
-  let summary = "vector";
+  let summary = "A quantity reperesented by both direction and magnitude";
 
   let arguments = (ins I32ElementsAttr:$value);
   let results = (outs I32Tensor);
@@ -32,6 +32,30 @@ def VectorOp : Scad_Op<"vector", [Pure]> {
     OpBuilder<(ins "int32_t":$value)>
   ];
 
+}
+
+
+def FuncOp : Scad_Op<"fn", [
+    FunctionOpInterface, IsolatedFromAbove
+  ]> {
+  let summary = "user defined function operation";
+
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+  let regions = (region AnyRegion:$body);
+
+  let builders = [OpBuilder<(ins
+    "StringRef":$name, "FunctionType":$type,
+    CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)
+  >];
+
+  let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
 }
 
 #endif // SCAD_OPS

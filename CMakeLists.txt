@@ -46,6 +46,7 @@ add_llvm_executable(scadc
 	scadc.cpp
 	src/Dialect.cpp
 	src/affine_lowering.cpp
+	src/llvm_lowering.cpp
 DEPENDS
 	ScadOpsIncGen
 )
@@ -58,13 +59,20 @@ target_link_libraries(scadc
 		${dialect_libs}
 		${extension_libs}
 		MLIRAnalysis
+		MLIRBuiltinToLLVMIRTranslation
 		MLIRCallInterfaces
 		MLIRCastInterfaces
+		MLIRExecutionEngine
 		MLIRFunctionInterfaces
 		MLIRIR
+		MLIRLLVMCommonConversion
+		MLIRLLVMDialect
+		MLIRLLVMToLLVMIRTranslation
+		MLIRMemRefDialect
 		MLIRParser
 		MLIRPass
 		MLIRSideEffectInterfaces
 		MLIRSupport
+		MLIRTargetLLVMIRExport
 		MLIRTransforms
 )

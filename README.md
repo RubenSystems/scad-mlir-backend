@@ -9,7 +9,7 @@ To make:
 
 ```sh
 cmake -G Ninja $LLVM_SRC_DIR \
-    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_BUILD_TYPE=Debug \
     -DLLVM_TARGETS_TO_BUILD=host \
     -DLLVM_ENABLE_PROJECTS=mlir \
     -DLLVM_EXTERNAL_PROJECTS=scad \

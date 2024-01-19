@@ -21,38 +21,50 @@ using namespace mlir::scad;
 
 #include "Dialect.cpp.inc"
 
-
 void SCADDialect::initialize() {
-  addOperations<
+	addOperations<
 #define GET_OP_LIST
 #include "Ops.cpp.inc"
-      >();
+		>();
 }
 
-void VectorOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, int32_t value) {
-  auto dataType = RankedTensorType::get({}, builder.getI32Type());
-  auto dataAttribute = DenseIntElementsAttr::get(dataType, value);
-  VectorOp::build(builder, state, dataType, dataAttribute);
+/*
+===
+  Vector Op
+===
+*/
+void VectorOp::build(
+	mlir::OpBuilder & builder,
+	mlir::OperationState & state,
+	int32_t value
+) {
+	auto dataType = RankedTensorType::get({}, builder.getI32Type());
+	auto dataAttribute = DenseIntElementsAttr::get(dataType, value);
+	VectorOp::build(builder, state, dataType, dataAttribute);
 }
 
-mlir::ParseResult VectorOp::parse(mlir::OpAsmParser &parser, mlir::OperationState &result) {
-  mlir::DenseElementsAttr value;
-  if (parser.parseOptionalAttrDict(result.attributes) ||
-      parser.parseAttribute(value, "value", result.attributes))
-    return failure();
+mlir::ParseResult
+VectorOp::parse(mlir::OpAsmParser & parser, mlir::OperationState & result) {
+	mlir::DenseElementsAttr value;
+	if (parser.parseOptionalAttrDict(result.attributes) ||
+	    parser.parseAttribute(value, "value", result.attributes))
+		return failure();
 
-  result.addTypes(value.getType());
-  return success();
+	result.addTypes(value.getType());
+	return success();
 }
 
-void VectorOp::print(mlir::OpAsmPrinter &printer) {
-  printer << " ";
-  printer.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"value"});
-  printer << getValue();
+void VectorOp::print(mlir::OpAsmPrinter & printer) {
+	printer << " ";
+	printer.printOptionalAttrDict(
+		(*this)->getAttrs(),
+		/*elidedAttrs=*/{ "value" }
+	);
+	printer << getValue();
 }
 
 mlir::LogicalResult VectorOp::verify() {
-  return mlir::success();
+	return mlir::success();
 }
 
 #define GET_OP_CLASSES
