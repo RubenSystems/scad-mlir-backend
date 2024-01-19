@@ -87,12 +87,13 @@ int main () {
 	mlir::MLIRContext context(registry);
 	mlir::OpBuilder builder(&context);
 	mlir::ModuleOp mod = mlir::ModuleOp::create(builder.getUnknownLoc());
+	mlir::OwningOpRef<mlir::ModuleOp> owned_mod = mod;
 
 	context.getOrLoadDialect<mlir::scad::SCADDialect>();
 
-	mlir::OwningOpRef<mlir::ModuleOp> mlir = generate_mlir(mod, context);
+	auto function = generate_mlir_func(builder, mod, context);
 
-	mlir::PassManager pm (mlir.get()->getName());
+	mlir::PassManager pm (owned_mod.get()->getName());
 
 	if (mlir::failed(mlir::applyPassManagerCLOptions(pm))) {
 		std::cout << "failed to apply cl options\n";
@@ -101,16 +102,16 @@ int main () {
     	
 
 
-	// mlir->dump();
+	owned_mod->dump();
 	pm.addPass(mlir::scad::createLowerToAffinePass());
 	pm.addPass(mlir::scad::createLowerToLLVMPass());
-	if (mlir::failed(pm.run(*mlir))) {
+	if (mlir::failed(pm.run(*owned_mod))) {
 		std::cout << "failed to run passes\n";
 		return -1;
 	}
 	
 
-	mlir->dump();
+	owned_mod->dump();
 
 	// dumpLLVMIR(mod);
 }

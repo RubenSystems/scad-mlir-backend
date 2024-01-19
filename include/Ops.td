@@ -49,6 +49,20 @@ def FuncOp : Scad_Op<"fn", [
   );
   let regions = (region AnyRegion:$body);
 
+  let extraClassDeclaration = [{
+    //===------------------------------------------------------------------===//
+    // FunctionOpInterface Methods
+    //===------------------------------------------------------------------===//
+
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    Region *getCallableRegion() { return &getBody(); }
+  }];
+
   let builders = [OpBuilder<(ins
     "StringRef":$name, "FunctionType":$type,
     CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)
@@ -57,5 +71,31 @@ def FuncOp : Scad_Op<"fn", [
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;
 }
+
+
+def ReturnOp : Scad_Op<"return", [Pure, HasParent<"FuncOp">,
+                                 Terminator]> {
+  let summary = "return operation";
+
+
+  let arguments = (ins Variadic<I32Tensor>:$input);
+
+  // The return operation only emits the input in the format if it is present.
+  let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
+
+  // Allow building a ReturnOp with no return operand.
+  let builders = [
+    OpBuilder<(ins), [{ build($_builder, $_state, std::nullopt); }]>
+  ];
+
+  // Provide extra utility definitions on the c++ operation class definition.
+  let extraClassDeclaration = [{
+    bool hasOperand() { return getNumOperands() != 0; }
+  }];
+
+  // Indicate that additional verification for this operation is necessary.
+  let hasVerifier = 1;
+}
+
 
 #endif // SCAD_OPS
