@@ -31,7 +31,7 @@ mlir::Value generate_mlir_constant(
 	mlir::MLIRContext & context
 ) {
 	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("jeef"), 100, 100
+		&context, std::string("main"), 100, 100
 	);
 	return builder.create<mlir::scad::VectorOp>(location, 10);
 }
@@ -42,7 +42,7 @@ mlir::scad::FuncOp generate_mlir_func_proto(
 	mlir::MLIRContext & context
 ) {
 	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("jeef"), 100, 100
+		&context, std::string("main"), 100, 100
 	);
 
 	// This is a generic function, the return type will be inferred later.
@@ -53,7 +53,7 @@ mlir::scad::FuncOp generate_mlir_func_proto(
 	auto funcType = builder.getFunctionType(argTypes, std::nullopt);
 
 	builder.setInsertionPointToEnd(mod.getBody());
-	return builder.create<mlir::scad::FuncOp>(location, "jeef", funcType);
+	return builder.create<mlir::scad::FuncOp>(location, "main", funcType);
 }
 
 mlir::scad::FuncOp generate_mlir_func(
@@ -61,9 +61,8 @@ mlir::scad::FuncOp generate_mlir_func(
 	mlir::ModuleOp & mod,
 	mlir::MLIRContext & context
 ) {
-
 	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("jeef"), 100, 100
+		&context, std::string("main"), 100, 100
 	);
 	// Create an MLIR function for the given prototype.
 	builder.setInsertionPointToEnd(mod.getBody());
@@ -97,7 +96,8 @@ mlir::scad::FuncOp generate_mlir_func(
 	// (this would possibly help the REPL case later)
 	mlir::scad::ReturnOp returnOp;
 	if (!entryBlock.empty())
-		returnOp = llvm::dyn_cast<mlir::scad::ReturnOp>(entryBlock.back());
+		returnOp =
+			llvm::dyn_cast<mlir::scad::ReturnOp>(entryBlock.back());
 	if (!returnOp) {
 		builder.create<mlir::scad::ReturnOp>(location);
 	} else if (returnOp.hasOperand()) {

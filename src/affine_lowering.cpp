@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "Dialect.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -151,7 +153,7 @@ struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 		// functor recursively walks the dimensions of the constant shape,
 		// generating a store when the recursion hits the base case.
 		SmallVector<Value, 2> indices;
-		auto valueIt = constantValue.value_begin<FloatAttr>();
+		auto valueIt = constantValue.value_begin<IntegerAttr>();
 		std::function<void(uint64_t)> storeElements = [&](uint64_t dimension
 							      ) {
 			// The last dimension is the base case of the recursion, at this point
@@ -187,6 +189,56 @@ struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 	}
 };
 
+struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
+	using OpConversionPattern<scad::FuncOp>::OpConversionPattern;
+
+	LogicalResult matchAndRewrite(
+		scad::FuncOp op,
+		OpAdaptor adaptor,
+		ConversionPatternRewriter & rewriter
+	) const final {
+		// We only lower the main function as we expect that all other functions
+		// have been inlined.
+		if (op.getName() != "main")
+			return failure();
+
+		// Verify that the given main has no inputs and results.
+		if (op.getNumArguments() ||
+		    op.getFunctionType().getNumResults()) {
+			return rewriter.notifyMatchFailure(op, [](Diagnostic & diag) {
+				diag << "expected 'main' to have 0 inputs and 0 results";
+			});
+		}
+
+		// Create a new non-toy function, with the same region.
+		auto func = rewriter.create<mlir::func::FuncOp>(
+			op.getLoc(), op.getName(), op.getFunctionType()
+		);
+		rewriter.inlineRegionBefore(
+			op.getRegion(), func.getBody(), func.end()
+		);
+		rewriter.eraseOp(op);
+		return success();
+	}
+};
+
+struct ReturnOpLowering : public OpRewritePattern<scad::ReturnOp> {
+	using OpRewritePattern<scad::ReturnOp>::OpRewritePattern;
+
+	LogicalResult matchAndRewrite(
+		scad::ReturnOp op,
+		PatternRewriter & rewriter
+	) const final {
+		// During this lowering, we expect that all function calls have been
+		// inlined.
+		if (op.hasOperand())
+			return failure();
+
+		rewriter.replaceOpWithNewOp<func::ReturnOp>(op);
+		return success();
+	}
+};
+
 namespace {
 	struct SCADToAffineLoweringPass : public PassWrapper<
 						  SCADToAffineLoweringPass,
@@ -209,6 +261,7 @@ namespace {
 void SCADToAffineLoweringPass::runOnOperation() {
 	// The first thing to define is the conversion target. This will define the
 	// final target for this lowering.
+	std::cout << "HI!\n";
 	ConversionTarget target(getContext());
 
 	// We define the specific operations, or dialects, that are legal targets for
