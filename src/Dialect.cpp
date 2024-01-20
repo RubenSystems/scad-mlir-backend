@@ -125,5 +125,48 @@ mlir::LogicalResult ReturnOp::verify() {
 	return mlir::success();
 }
 
+/*
+==
+Call Op
+==
+*/
+
+void GenericCallOp::build(
+	mlir::OpBuilder & builder,
+	mlir::OperationState & state,
+	StringRef callee,
+	ArrayRef<mlir::Value> arguments
+) {
+	state.addTypes(UnrankedTensorType::get(builder.getI32Type()));
+	state.addOperands(arguments);
+	state.addAttribute(
+		"callee", mlir::SymbolRefAttr::get(builder.getContext(), callee)
+	);
+}
+
+/// Return the callee of the generic call operation, this is required by the
+/// call interface.
+CallInterfaceCallable GenericCallOp::getCallableForCallee() {
+	return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+/// Set the callee for the generic call operation, this is required by the call
+/// interface.
+void GenericCallOp::setCalleeFromCallable(CallInterfaceCallable callee) {
+	(*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+}
+
+/// Get the argument operands to the called function, this is required by the
+/// call interface.
+Operation::operand_range GenericCallOp::getArgOperands() {
+	return getInputs();
+}
+
+/// Get the argument operands to the called function as a mutable range, this is
+/// required by the call interface.
+MutableOperandRange GenericCallOp::getArgOperandsMutable() {
+	return getInputsMutable();
+}
+
 #define GET_OP_CLASSES
 #include "Ops.cpp.inc"

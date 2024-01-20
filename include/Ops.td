@@ -80,21 +80,34 @@ def ReturnOp : Scad_Op<"return", [Pure, HasParent<"FuncOp">,
 
   let arguments = (ins Variadic<I32Tensor>:$input);
 
-  // The return operation only emits the input in the format if it is present.
   let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
 
-  // Allow building a ReturnOp with no return operand.
   let builders = [
     OpBuilder<(ins), [{ build($_builder, $_state, std::nullopt); }]>
   ];
 
-  // Provide extra utility definitions on the c++ operation class definition.
   let extraClassDeclaration = [{
     bool hasOperand() { return getNumOperands() != 0; }
   }];
 
-  // Indicate that additional verification for this operation is necessary.
   let hasVerifier = 1;
+}
+
+def GenericCallOp : Scad_Op<"generic_call",
+    [DeclareOpInterfaceMethods<CallOpInterface>]> {
+  let summary = "generic call operation";
+
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32Tensor>:$inputs);
+
+  let results = (outs I32Tensor);
+
+  let assemblyFormat = [{
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "StringRef":$callee, "ArrayRef<Value>":$arguments)>
+  ];
 }
 
 

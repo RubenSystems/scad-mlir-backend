@@ -1,4 +1,4 @@
-#include <iostream> 
+#include <iostream>
 #include <mlir_generator.h>
 #include <passes.h>
 
@@ -32,51 +32,54 @@
 #include "llvm/Support/raw_ostream.h"
 
 int dumpLLVMIR(mlir::ModuleOp module) {
-  // Register the translation to LLVM IR with the MLIR context.
-  mlir::registerBuiltinDialectTranslation(*module->getContext());
-  mlir::registerLLVMDialectTranslation(*module->getContext());
+	// Register the translation to LLVM IR with the MLIR context.
+	mlir::registerBuiltinDialectTranslation(*module->getContext());
+	mlir::registerLLVMDialectTranslation(*module->getContext());
 
-  // Convert the module to LLVM IR in a new LLVM IR context.
-  llvm::LLVMContext llvmContext;
-  auto llvmModule = mlir::translateModuleToLLVMIR(module, llvmContext);
-  if (!llvmModule) {
-    llvm::errs() << "Failed to emit LLVM IR\n";
-    return -1;
-  }
+	// Convert the module to LLVM IR in a new LLVM IR context.
+	llvm::LLVMContext llvmContext;
+	auto llvmModule = mlir::translateModuleToLLVMIR(module, llvmContext);
+	if (!llvmModule) {
+		llvm::errs() << "Failed to emit LLVM IR\n";
+		return -1;
+	}
 
-  // Initialize LLVM targets.
-  llvm::InitializeNativeTarget();
-  llvm::InitializeNativeTargetAsmPrinter();
+	// Initialize LLVM targets.
+	llvm::InitializeNativeTarget();
+	llvm::InitializeNativeTargetAsmPrinter();
 
-  // Configure the LLVM Module
-  auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
-  if (!tmBuilderOrError) {
-    llvm::errs() << "Could not create JITTargetMachineBuilder\n";
-    return -1;
-  }
+	// Configure the LLVM Module
+	auto tmBuilderOrError =
+		llvm::orc::JITTargetMachineBuilder::detectHost();
+	if (!tmBuilderOrError) {
+		llvm::errs() << "Could not create JITTargetMachineBuilder\n";
+		return -1;
+	}
 
-  auto tmOrError = tmBuilderOrError->createTargetMachine();
-  if (!tmOrError) {
-    llvm::errs() << "Could not create TargetMachine\n";
-    return -1;
-  }
-  mlir::ExecutionEngine::setupTargetTripleAndDataLayout(llvmModule.get(),
-                                                        tmOrError.get().get());
+	auto tmOrError = tmBuilderOrError->createTargetMachine();
+	if (!tmOrError) {
+		llvm::errs() << "Could not create TargetMachine\n";
+		return -1;
+	}
+	mlir::ExecutionEngine::setupTargetTripleAndDataLayout(
+		llvmModule.get(), tmOrError.get().get()
+	);
 
-  /// Optionally run an optimization pipeline over the llvm module.
-  auto optPipeline = mlir::makeOptimizingTransformer(
-      /*optLevel=*/ 3, /*sizeLevel=*/0,
-      /*targetMachine=*/nullptr);
-  if (auto err = optPipeline(llvmModule.get())) {
-    llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
-    return -1;
-  }
-  llvm::errs() << *llvmModule << "\n";
-  return 0;
+	/// Optionally run an optimization pipeline over the llvm module.
+	auto optPipeline = mlir::makeOptimizingTransformer(
+		/*optLevel=*/3,
+		/*sizeLevel=*/0,
+		/*targetMachine=*/nullptr
+	);
+	if (auto err = optPipeline(llvmModule.get())) {
+		llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
+		return -1;
+	}
+	llvm::errs() << *llvmModule << "\n";
+	return 0;
 }
 
-int main () {
-
+int main() {
 	mlir::registerAsmPrinterCLOptions();
 	mlir::registerMLIRContextCLOptions();
 	mlir::registerPassManagerCLOptions();
@@ -90,17 +93,15 @@ int main () {
 	mlir::OwningOpRef<mlir::ModuleOp> owned_mod = mod;
 
 	context.getOrLoadDialect<mlir::scad::SCADDialect>();
-
+	auto function_a = generate_mlir_func_v2(builder, mod, context);
 	auto function = generate_mlir_func(builder, mod, context);
 
-	mlir::PassManager pm (owned_mod.get()->getName());
+	mlir::PassManager pm(owned_mod.get()->getName());
 
 	if (mlir::failed(mlir::applyPassManagerCLOptions(pm))) {
 		std::cout << "failed to apply cl options\n";
 		return -1;
 	}
-    	
-
 
 	owned_mod->dump();
 	pm.addPass(mlir::scad::createLowerToAffinePass());
@@ -109,9 +110,48 @@ int main () {
 		std::cout << "failed to run passes\n";
 		return -1;
 	}
-	
-
 	owned_mod->dump();
+
+	mlir::registerBuiltinDialectTranslation(*mod->getContext());
+	mlir::registerLLVMDialectTranslation(*mod->getContext());
+
+	llvm::LLVMContext llvmContext;
+	auto llvmModule = mlir::translateModuleToLLVMIR(mod, llvmContext);
+	if (!llvmModule) {
+		llvm::errs() << "Failed to emit LLVM IR\n";
+		return -1;
+	}
+
+	llvm::InitializeNativeTarget();
+	llvm::InitializeNativeTargetAsmPrinter();
+
+	auto tmBuilderOrError =
+		llvm::orc::JITTargetMachineBuilder::detectHost();
+	if (!tmBuilderOrError) {
+		llvm::errs() << "Could not create JITTargetMachineBuilder\n";
+		return -1;
+	}
+
+	auto tmOrError = tmBuilderOrError->createTargetMachine();
+	if (!tmOrError) {
+		llvm::errs() << "Could not create TargetMachine\n";
+		return -1;
+	}
+	mlir::ExecutionEngine::setupTargetTripleAndDataLayout(
+		llvmModule.get(), tmOrError.get().get()
+	);
+
+	/// Optionally run an optimization pipeline over the llvm module.
+	auto optPipeline = mlir::makeOptimizingTransformer(
+		/*optLevel=*/3,
+		/*sizeLevel=*/0,
+		/*targetMachine=*/nullptr
+	);
+	if (auto err = optPipeline(llvmModule.get())) {
+		llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
+		return -1;
+	}
+	llvm::errs() << *llvmModule << "\n";
 
 	// dumpLLVMIR(mod);
 }

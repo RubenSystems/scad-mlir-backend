@@ -199,16 +199,16 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 	) const final {
 		// We only lower the main function as we expect that all other functions
 		// have been inlined.
-		if (op.getName() != "main")
-			return failure();
+		// if (op.getName() != "main")
+		// 	return failure();
 
 		// Verify that the given main has no inputs and results.
-		if (op.getNumArguments() ||
-		    op.getFunctionType().getNumResults()) {
-			return rewriter.notifyMatchFailure(op, [](Diagnostic & diag) {
-				diag << "expected 'main' to have 0 inputs and 0 results";
-			});
-		}
+		// if (op.getNumArguments() ||
+		//     op.getFunctionType().getNumResults()) {
+		// 	return rewriter.notifyMatchFailure(op, [](Diagnostic & diag) {
+		// 		diag << "expected 'main' to have 0 inputs and 0 results";
+		// 	});
+		// }
 
 		// Create a new non-toy function, with the same region.
 		auto func = rewriter.create<mlir::func::FuncOp>(
@@ -229,12 +229,35 @@ struct ReturnOpLowering : public OpRewritePattern<scad::ReturnOp> {
 		scad::ReturnOp op,
 		PatternRewriter & rewriter
 	) const final {
-		// During this lowering, we expect that all function calls have been
-		// inlined.
 		if (op.hasOperand())
 			return failure();
 
 		rewriter.replaceOpWithNewOp<func::ReturnOp>(op);
+		return success();
+	}
+};
+
+struct CallOpLowering : public OpRewritePattern<mlir::scad::GenericCallOp> {
+	using OpRewritePattern<mlir::scad::GenericCallOp>::OpRewritePattern;
+
+	LogicalResult matchAndRewrite(
+		scad::GenericCallOp op,
+		PatternRewriter & rewriter
+	) const final {
+		// Get the input tensors.
+
+		// auto calleeAttr = op.calleeAttr();
+		StringRef callee = "do_something";
+
+		mlir::OperandRange inputs = op.getInputs();
+
+		// Create the affine.call op.
+		auto affineCallOp = rewriter.create<func::CallOp>(
+			op.getLoc(), callee, op.getOperandTypes(), inputs
+		);
+		affineCallOp->setAttrs(op->getAttrs());
+		// rewriter.replaceOp(op, affineCallOp.getResults());
+		rewriter.eraseOp(op);
 		return success();
 	}
 };
@@ -290,7 +313,11 @@ void SCADToAffineLoweringPass::runOnOperation() {
 	// Now that the conversion target has been defined, we just need to provide
 	// the set of patterns that will lower the Toy operations.
 	RewritePatternSet patterns(&getContext());
-	patterns.add<VectorOpLowering, FuncOpLowering, ReturnOpLowering>(&getContext());
+	patterns
+		.add<VectorOpLowering,
+		     FuncOpLowering,
+		     ReturnOpLowering,
+		     CallOpLowering>(&getContext());
 
 	// With the target and rewrite patterns defined, we can now attempt the
 	// conversion. The conversion will signal failure if any of our `illegal`
