@@ -119,8 +119,7 @@ struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 		// When lowering the constant operation, we allocate and assign the constant
 		// values to a corresponding memref allocation.
 		auto tensorType = llvm::cast<RankedTensorType>(op.getType());
-		auto memRefType =
-			convert_tensor_type_to_memref_type(tensorType);
+		auto memRefType = convert_tensor_type_to_memref_type(tensorType);
 		auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
 
 		// We will be generating constant indices up-to the largest dimension.
@@ -203,11 +202,10 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 			op.getLoc(), op.getName(), adaptor.getFunctionType()
 		);
 
-		if (op.getName() != "main") {
-			auto res_type = adaptor.getFunctionType().getResults(
-			)[0]; // watch out it dosnt work for meore then one restype lololol
-			auto tensor_type =
-				llvm::cast<RankedTensorType>(res_type);
+
+		if (adaptor.getFunctionType().getResults().size() > 0) {
+			auto res_type = adaptor.getFunctionType().getResults()[0];// watch out it dosnt work for meore then one restype 
+			auto tensor_type = llvm::cast<RankedTensorType>(res_type);
 
 			func.setType(rewriter.getFunctionType(
 				func.getFunctionType().getInputs(),
@@ -252,9 +250,7 @@ struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 	) const final {
 		StringRef callee = op.getCalleeAttrName();
 		auto inputs = adaptor.getInputs();
-		auto tensor_type =
-			llvm::cast<RankedTensorType>((*op->result_type_begin())
-			);
+		auto tensor_type = llvm::cast<RankedTensorType>((*op->result_type_begin()));
 
 		auto call_op = rewriter.create<func::CallOp>(
 			op.getLoc(),
