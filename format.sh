@@ -1,0 +1,1 @@
+clang-format -style="file:clang-format.txt" -i src/*.cpp include/*.h scadc.cpp
