@@ -110,5 +110,14 @@ def GenericCallOp : Scad_Op<"generic_call",
   ];
 }
 
+def PrintOp : Scad_Op<"print"> {
+
+
+  let arguments = (ins AnyTypeOf<[I32Tensor, I32MemRef]>:$input);
+
+  let assemblyFormat = "$input attr-dict `:` type($input)";
+}
+
+
 
 #endif // SCAD_OPS

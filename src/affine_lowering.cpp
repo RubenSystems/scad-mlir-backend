@@ -119,7 +119,8 @@ struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 		// When lowering the constant operation, we allocate and assign the constant
 		// values to a corresponding memref allocation.
 		auto tensorType = llvm::cast<RankedTensorType>(op.getType());
-		auto memRefType = convert_tensor_type_to_memref_type(tensorType);
+		auto memRefType =
+			convert_tensor_type_to_memref_type(tensorType);
 		auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
 
 		// We will be generating constant indices up-to the largest dimension.
@@ -202,10 +203,11 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 			op.getLoc(), op.getName(), adaptor.getFunctionType()
 		);
 
-
 		if (adaptor.getFunctionType().getResults().size() > 0) {
-			auto res_type = adaptor.getFunctionType().getResults()[0];// watch out it dosnt work for meore then one restype 
-			auto tensor_type = llvm::cast<RankedTensorType>(res_type);
+			auto res_type = adaptor.getFunctionType().getResults(
+			)[0]; // watch out it dosnt work for meore then one restype
+			auto tensor_type =
+				llvm::cast<RankedTensorType>(res_type);
 
 			func.setType(rewriter.getFunctionType(
 				func.getFunctionType().getInputs(),
@@ -217,6 +219,21 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 			op.getRegion(), func.getBody(), func.end()
 		);
 		rewriter.eraseOp(op);
+		return success();
+	}
+};
+
+struct PrintOpLowering : public OpConversionPattern<scad::PrintOp> {
+	using OpConversionPattern<scad::PrintOp>::OpConversionPattern;
+
+	LogicalResult matchAndRewrite(
+		scad::PrintOp op,
+		OpAdaptor adaptor,
+		ConversionPatternRewriter & rewriter
+	) const final {
+		rewriter.updateRootInPlace(op, [&] {
+			op->setOperands(adaptor.getOperands());
+		});
 		return success();
 	}
 };
@@ -249,8 +266,11 @@ struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 		ConversionPatternRewriter & rewriter
 	) const final {
 		StringRef callee = op.getCalleeAttrName();
+
 		auto inputs = adaptor.getInputs();
-		auto tensor_type = llvm::cast<RankedTensorType>((*op->result_type_begin()));
+		auto tensor_type =
+			llvm::cast<RankedTensorType>((*op->result_type_begin())
+			);
 
 		auto call_op = rewriter.create<func::CallOp>(
 			op.getLoc(),
@@ -289,14 +309,8 @@ namespace {
 } // namespace
 
 void SCADToAffineLoweringPass::runOnOperation() {
-	// The first thing to define is the conversion target. This will define the
-	// final target for this lowering.
-	std::cout << "HI!\n";
 	ConversionTarget target(getContext());
 
-	// We define the specific operations, or dialects, that are legal targets for
-	// this lowering. In our case, we are lowering to a combination of the
-	// `Affine`, `Arith`, `Func`, and `MemRef` dialects.
 	target.addLegalDialect<
 		affine::AffineDialect,
 		BuiltinDialect,
@@ -304,31 +318,20 @@ void SCADToAffineLoweringPass::runOnOperation() {
 		func::FuncDialect,
 		memref::MemRefDialect>();
 
-	// We also define the Toy dialect as Illegal so that the conversion will fail
-	// if any of these operations are *not* converted. Given that we actually want
-	// a partial lowering, we explicitly mark the Toy operations that don't want
-	// to lower, `toy.print`, as `legal`. `toy.print` will still need its operands
-	// to be updated though (as we convert from TensorType to MemRefType), so we
-	// only treat it as `legal` if its operands are legal.
-	// target.addIllegalDialect<scad::SCADDialect>();
-	// target.addDynamicallyLegalOp<toy::PrintOp>([](toy::PrintOp op) {
-	//   return llvm::none_of(op->getOperandTypes(),
-	//                        [](Type type) { return llvm::isa<TensorType>(type);
-	//                        });
-	// });
+	target.addDynamicallyLegalOp<scad::PrintOp>([](scad::PrintOp op) {
+		return llvm::none_of(op->getOperandTypes(), [](Type type) {
+			return llvm::isa<TensorType>(type);
+		});
+	});
 
-	// Now that the conversion target has been defined, we just need to provide
-	// the set of patterns that will lower the Toy operations.
 	RewritePatternSet patterns(&getContext());
 	patterns
 		.add<VectorOpLowering,
 		     FuncOpLowering,
 		     ReturnOpLowering,
-		     CallOpLowering>(&getContext());
+		     CallOpLowering,
+		     PrintOpLowering>(&getContext());
 
-	// With the target and rewrite patterns defined, we can now attempt the
-	// conversion. The conversion will signal failure if any of our `illegal`
-	// operations were not converted successfully.
 	if (failed(applyPartialConversion(
 		    getOperation(), target, std::move(patterns)
 	    )))

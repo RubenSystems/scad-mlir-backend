@@ -40,7 +40,7 @@ mlir::DenseIntElementsAttr generate_mlir_mat(mlir::OpBuilder & builder) {
 	// The type of this attribute is tensor of 64-bit floating-point with the
 	// shape of the literal.
 	mlir::Type elementType = builder.getI32Type();
-	auto dataType = mlir::RankedTensorType::get({ 1, 3, 2 }, elementType);
+	auto dataType = mlir::RankedTensorType::get({ 3, 2 }, elementType);
 	return mlir::DenseIntElementsAttr::get(dataType, llvm::ArrayRef(data));
 }
 
@@ -59,6 +59,21 @@ mlir::Value generate_mlir_constant(
 		location, generate_mlir_mat(builder)
 	);
 }
+
+  mlir::LogicalResult generate_mlir_print(	
+	mlir::OpBuilder & builder,
+	mlir::ModuleOp & mod,
+	mlir::MLIRContext & context,
+	mlir::Value arg
+
+) {
+	mlir::Location location = mlir::FileLineColLoc::get(
+		&context, std::string("pritops"), 100, 100
+	);
+
+    builder.create<mlir::scad::PrintOp>(location, arg);
+    return mlir::success();
+  }
 
 mlir::scad::FuncOp generate_mlir_func_proto(
 	std::string name,
@@ -97,12 +112,14 @@ mlir::Value generate_mlir_function_call(
 	// 	auto arg = mlirGen(*expr);
 	// 	if (!arg)
 	// 		return nullptr;
-	// 	operands.push_back(arg);
+	// operands.push_back(
+	// 	generate_mlir_constant("v1 array", builder, mod, context)
+	// );
 	// }
 
 	return builder.create<mlir::scad::GenericCallOp>(
 		location,
-		mlir::RankedTensorType::get({ 1, 3, 2 }, builder.getI32Type()),
+		mlir::RankedTensorType::get({ 3, 2 }, builder.getI32Type()),
 		mlir::SymbolRefAttr::get(builder.getContext(), callee),
 		operands
 	);
@@ -175,7 +192,7 @@ mlir::scad::FuncOp generate_mlir_func_v2(
 		function.setType(builder.getFunctionType(
 			function.getFunctionType().getInputs(),
 			mlir::RankedTensorType::get(
-				{ 1, 3, 2 }, builder.getI32Type()
+				{ 3, 2 }, builder.getI32Type()
 			)
 		));
 	}
@@ -222,7 +239,7 @@ mlir::scad::FuncOp generate_mlir_func(
 
 	// Emit the body of the function.
 	generate_mlir_constant("v1 array", builder, mod, context);
-	generate_mlir_constant("v1 array1", builder, mod, context);
+	generate_mlir_print(builder, mod, context, generate_mlir_constant("v1 array1", builder, mod, context));
 	generate_mlir_function_call(builder, mod, context);
 	// Implicitly return void if no return statement was emitted.
 	// FIXME: we may fix the parser instead to always return the last expression
