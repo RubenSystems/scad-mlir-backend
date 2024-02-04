@@ -73,6 +73,7 @@ IndentCaseLabels: false
 IndentGotoLabels: false
 IndentPPDirectives: None
 IndentWidth: 8
+IndentExternBlock: Indent
 IndentWrappedFunctionNames: false
 JavaScriptQuotes: Leave
 JavaScriptWrapImports: true

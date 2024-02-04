@@ -1,6 +1,5 @@
 #ifndef SCADC_MLIR_GENERATOR_H
 #define SCADC_MLIR_GENERATOR_H
-
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Value.h"
@@ -18,12 +17,14 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 
+#include "ast.h"
 #include "Dialect.h"
 
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 using llvm::ArrayRef;
 using llvm::cast;
@@ -34,15 +35,168 @@ using llvm::SmallVector;
 using llvm::StringRef;
 using llvm::Twine;
 
-mlir::DenseIntElementsAttr generate_mlir_mat(mlir::OpBuilder & builder) {
-	std::vector<uint32_t> data = { 100, 200, 300, 400, 500, 600 };
+class SCADMIRLowering {
+    public:
+	SCADMIRLowering(
+		mlir::MLIRContext & context,
+		mlir::OpBuilder & builder,
+		mlir::ModuleOp & mod
+	)
+		: context(context)
+		, builder(builder)
+		, mod(mod) {
+	}
 
-	// The type of this attribute is tensor of 64-bit floating-point with the
-	// shape of the literal.
-	mlir::Type elementType = builder.getI32Type();
-	auto dataType = mlir::RankedTensorType::get({ 3, 2 }, elementType);
-	return mlir::DenseIntElementsAttr::get(dataType, llvm::ArrayRef(data));
-}
+    public:
+	void codegen(FFIHIRExpr expression) {
+		switch (expression.tag) {
+		case VariableDecl:
+			scad_constant(expression.value.variable_decl);
+			break;
+		case FunctionDecl:
+			scad_func(expression.value.func_decl);
+			break;
+		case Noop:
+			break;
+		case Return:
+			scad_return(expression.value.ret);
+			break;
+		case ForwardFunctionDecl: 
+			scad_func_prototype(expression.value.forward_func_decl);
+		default:
+			std::cout
+				<< "what are you trying to do to me lol \n\n\n";
+			break;
+		}
+	}
+
+    private:
+	mlir::MLIRContext & context;
+	mlir::OpBuilder & builder;
+	mlir::ModuleOp & mod;
+
+
+	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
+
+    private:
+	mlir::DenseIntElementsAttr scad_matrix(FFIHIRArray arr) {
+		std::vector<uint32_t> data;
+
+		for (size_t i = 0; i < arr.size; i++) {
+			data.push_back((uint32_t)arr.vals[i].value.integer.value
+			);
+		}
+
+		// The type of this attribute is tensor of 64-bit floating-point with the
+		// shape of the literal.
+		mlir::Type elementType = builder.getI32Type();
+		auto dataType = mlir::RankedTensorType::get(
+			{ (long long)arr.size }, elementType
+		);
+		return mlir::DenseIntElementsAttr::get(
+			dataType, llvm::ArrayRef(data)
+		);
+	}
+
+	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, std::string(decl.name), 100, 100
+		);
+
+		return builder.create<mlir::scad::VectorOp>(
+			location, scad_matrix(decl.e1.value.array)
+		);
+	}
+
+	mlir::scad::FuncOp scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
+		std::string name = std::string(ffd.name, 4);
+		std::cout << name << "HII\n\n";
+		mlir::Location location =
+			mlir::FileLineColLoc::get(&context, name, 100, 100);
+
+		// This is a generic function, the return type will be inferred later.
+		// Arguments type are uniformly unranked tensors.
+		llvm::SmallVector<mlir::Type, 4> argTypes(
+			0, mlir::RankedTensorType::get(10, builder.getI32Type())
+		);
+		auto funcType = builder.getFunctionType(argTypes, std::nullopt);
+
+		builder.setInsertionPointToEnd(mod.getBody());
+
+		mlir::scad::FuncOp function = builder.create<mlir::scad::FuncOp>(
+			location, name, funcType
+		);
+
+		functions[name] = function;
+
+		codegen(*ffd.e2);
+
+		return function;
+	}
+
+	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
+		std::string name = std::string(decl.name, 4);
+		std::cout << name << "HII\n\n";
+		mlir::Location location =
+			mlir::FileLineColLoc::get(&context, name, 100, 100);
+		// Create an MLIR function for the given prototype.
+		builder.setInsertionPointToEnd(mod.getBody());
+		// mlir::scad::FuncOp function = scad_func_prototype(name);
+		auto res = functions.find(name);
+		if (res == functions.end()) {
+			std::cout << "CANT FIND FUNCTION\n\n";
+			return nullptr;
+		}
+		auto function = res->second;
+			
+		
+
+		mlir::Block & entryBlock = function.front();
+		builder.setInsertionPointToStart(&entryBlock);
+
+		// Emit the body of the function.
+		codegen(*decl.block);
+
+		mlir::scad::ReturnOp returnOp;
+		if (!entryBlock.empty())
+			returnOp = llvm::dyn_cast<mlir::scad::ReturnOp>(
+				entryBlock.back()
+			);
+		if (!returnOp) {
+			builder.create<mlir::scad::ReturnOp>(location);
+		} else if (returnOp.hasOperand()) {
+			// Otherwise, if this return operation has an operand then add a result to
+			// the function.
+			function.setType(builder.getFunctionType(
+				function.getFunctionType().getInputs(),
+				mlir::RankedTensorType::get(
+					10, builder.getI32Type()
+				)
+			));
+		}
+
+		// If this function isn't main, then set the visibility to private.
+		// if (funcAST.getProto()->getName() != "main")
+		// 	function.setPrivate();
+
+		return function;
+	}
+
+	mlir::LogicalResult scad_return(
+		FFIHIRReturn ret
+	) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, std::string("RETURN STATEMENT!!!"), 100, 100
+		);
+
+		builder.create<mlir::scad::ReturnOp>(location);
+		return mlir::success();
+	}
+};
+
+/*
+
+
 
 mlir::Value generate_mlir_constant(
 	std::string name,
@@ -60,7 +214,7 @@ mlir::Value generate_mlir_constant(
 	);
 }
 
-  mlir::LogicalResult generate_mlir_print(	
+mlir::LogicalResult generate_mlir_print(
 	mlir::OpBuilder & builder,
 	mlir::ModuleOp & mod,
 	mlir::MLIRContext & context,
@@ -71,9 +225,9 @@ mlir::Value generate_mlir_constant(
 		&context, std::string("pritops"), 100, 100
 	);
 
-    builder.create<mlir::scad::PrintOp>(location, arg);
-    return mlir::success();
-  }
+	builder.create<mlir::scad::PrintOp>(location, arg);
+	return mlir::success();
+}
 
 mlir::scad::FuncOp generate_mlir_func_proto(
 	std::string name,
@@ -239,7 +393,12 @@ mlir::scad::FuncOp generate_mlir_func(
 
 	// Emit the body of the function.
 	generate_mlir_constant("v1 array", builder, mod, context);
-	generate_mlir_print(builder, mod, context, generate_mlir_constant("v1 array1", builder, mod, context));
+	generate_mlir_print(
+		builder,
+		mod,
+		context,
+		generate_mlir_constant("v1 array1", builder, mod, context)
+	);
 	generate_mlir_function_call(builder, mod, context);
 	// Implicitly return void if no return statement was emitted.
 	// FIXME: we may fix the parser instead to always return the last expression
@@ -265,5 +424,6 @@ mlir::scad::FuncOp generate_mlir_func(
 
 	return function;
 }
+*/
 
 #endif

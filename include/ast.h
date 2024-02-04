@@ -1,52 +1,70 @@
+#pragma once
+
 #include <stdint.h>
 #include <string>
+#include <stddef.h>
 
-struct TIRExpression {
-	enum class ExprType {
-		Integer,
-		Bool,
-		Void,
-		Phi,
-		Float,
-		VariableReference,
-		VariableDecl,
-		FunctionCall,
-		FunctionDefinition,
-		Conditional
+extern "C" {
+	struct FFIHIRArray {
+		const struct FFIHIRValue * vals;
+		size_t size;
 	};
 
-	ExprType type;
-
-	union {
-		intmax_t integer_val;
-		bool bool_val;
-		double float_val;
-
-		struct {
-			std::string name;
-		} variable_reference;
-
-		struct {
-			std::string name;
-			TIRExpression * e1;
-			TIRExpression * e2;
-		} variable_decl;
-
-		struct {
-			TIRExpression * e1;
-			TIRExpression * e2;
-		} function_call;
-
-		struct {
-			std::string arg_name;
-			TIRExpression * e1;
-		} function_definition;
-
-		struct {
-			TIRExpression * condition;
-			std::pair<std::string, TIRExpression *> if_block;
-			std::pair<std::string, TIRExpression *> else_block;
-			TIRExpression * e1;
-		} conditional;
+	struct FFIHIRInteger {
+		size_t value;
 	};
-};
+
+	union ValueUnion {
+		FFIHIRArray array;
+		FFIHIRInteger integer;
+	};
+
+	enum FFIHirValueTag { Array, Integer };
+
+	struct FFIHIRValue {
+		FFIHirValueTag tag;
+		ValueUnion value;
+	};
+
+	enum FFIHIRTag {
+		VariableDecl = 0,
+		Noop = 1,
+		FunctionDecl = 2,
+		ForwardFunctionDecl = 3,
+		Return = 4,
+	};
+
+	struct FFIHIRVariableDecl {
+		const char * name;
+		struct FFIHIRValue e1;
+		struct FFIHIRExpr * e2;
+	};
+
+	struct FFIHIRFunctionDecl {
+		const char * name;
+		const struct FFIHIRExpr * block;
+		const struct FFIHIRExpr * e2;
+	};
+
+	struct FFIHIRForwardFunctionDecl {
+		const char * name;
+		const struct FFIHIRExpr * e2;
+	};
+
+	struct FFIHIRReturn {
+		struct FFIHIRValue res;
+	};
+
+	union ExpressionUnion {
+		struct FFIHIRVariableDecl variable_decl;
+		struct FFIHIRFunctionDecl func_decl;
+		struct FFIHIRForwardFunctionDecl forward_func_decl;
+		uint8_t noop;
+		struct FFIHIRReturn ret;
+	};
+
+	struct FFIHIRExpr {
+		FFIHIRTag tag;
+		ExpressionUnion value;
+	};
+}

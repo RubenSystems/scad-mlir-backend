@@ -1,6 +1,7 @@
 #include <iostream>
 #include <mlir_generator.h>
 #include <passes.h>
+#include <ast.h>
 
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
@@ -28,8 +29,13 @@
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+
+extern "C" {
+	FFIHIRExpr compile();
+}
 
 int dumpLLVMIR(mlir::ModuleOp module) {
 	// Register the translation to LLVM IR with the MLIR context.
@@ -84,6 +90,8 @@ int main() {
 	mlir::registerMLIRContextCLOptions();
 	mlir::registerPassManagerCLOptions();
 
+	FFIHIRExpr x = compile();
+
 	mlir::DialectRegistry registry;
 	mlir::func::registerAllExtensions(registry);
 
@@ -91,10 +99,14 @@ int main() {
 	mlir::OpBuilder builder(&context);
 	mlir::ModuleOp mod = mlir::ModuleOp::create(builder.getUnknownLoc());
 	mlir::OwningOpRef<mlir::ModuleOp> owned_mod = mod;
-
 	context.getOrLoadDialect<mlir::scad::SCADDialect>();
-	auto function_a = generate_mlir_func_v2(builder, mod, context);
-	auto function = generate_mlir_func(builder, mod, context);
+
+	SCADMIRLowering scad_lowerer(context, builder, mod);
+
+	scad_lowerer.codegen(x);
+
+	// auto function_a = generate_mlir_func_v2(builder, mod, context);
+	// auto function = generate_mlir_func(builder, mod, context);
 
 	mlir::PassManager pm(owned_mod.get()->getName());
 

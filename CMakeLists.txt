@@ -31,6 +31,10 @@ else()
 	set(MLIR_INCLUDE_DIRS "${MLIR_INCLUDE_DIR};${MLIR_GENERATED_INCLUDE_DIR}")
 endif()
 
+set(SCAD_FRONTEND_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+find_library(SCAD_FRONTEND scad_frontend PATHS ${SCAD_FRONTEND_DIR} REQUIRED)
+
+
 set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR})
 set(STANDALONE_BINARY_DIR ${PROJECT_BINARY_DIR})
 include_directories(${LLVM_INCLUDE_DIRS})
@@ -58,6 +62,7 @@ target_link_libraries(scadc
 	PRIVATE
 		${dialect_libs}
 		${extension_libs}
+		${SCAD_FRONTEND}
 		MLIRAnalysis
 		MLIRBuiltinToLLVMIRTranslation
 		MLIRCallInterfaces
