@@ -100,7 +100,7 @@ class SCADMIRLowering {
 
 	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
 		mlir::Location location = mlir::FileLineColLoc::get(
-			&context, std::string(decl.name), 100, 100
+			&context, std::string(decl.name.data, decl.name.size), 100, 100
 		);
 
 		return builder.create<mlir::scad::VectorOp>(
@@ -109,8 +109,7 @@ class SCADMIRLowering {
 	}
 
 	mlir::scad::FuncOp scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
-		std::string name = std::string(ffd.name, 4);
-		std::cout << name << "HII\n\n";
+		std::string name = std::string(ffd.name.data, ffd.name.size);
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, name, 100, 100);
 
@@ -135,8 +134,7 @@ class SCADMIRLowering {
 	}
 
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
-		std::string name = std::string(decl.name, 4);
-		std::cout << name << "HII\n\n";
+		std::string name = std::string(decl.name.data, decl.name.size);
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, name, 100, 100);
 		// Create an MLIR function for the given prototype.

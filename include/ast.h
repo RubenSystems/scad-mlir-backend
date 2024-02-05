@@ -5,6 +5,11 @@
 #include <stddef.h>
 
 extern "C" {
+	struct FFIString {
+		const char * data; 
+		size_t size;
+	};
+
 	struct FFIHIRArray {
 		const struct FFIHIRValue * vals;
 		size_t size;
@@ -35,19 +40,19 @@ extern "C" {
 	};
 
 	struct FFIHIRVariableDecl {
-		const char * name;
+		struct FFIString name;
 		struct FFIHIRValue e1;
 		struct FFIHIRExpr * e2;
 	};
 
 	struct FFIHIRFunctionDecl {
-		const char * name;
+		struct FFIString name;
 		const struct FFIHIRExpr * block;
 		const struct FFIHIRExpr * e2;
 	};
 
 	struct FFIHIRForwardFunctionDecl {
-		const char * name;
+		struct FFIString name;
 		const struct FFIHIRExpr * e2;
 	};
 
