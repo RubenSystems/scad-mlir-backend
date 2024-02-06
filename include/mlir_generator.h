@@ -63,8 +63,9 @@ class SCADMIRLowering {
 			break;
 		case ForwardFunctionDecl: 
 			scad_func_prototype(expression.value.forward_func_decl);
+			break;
 		default:
-			std::cout
+			std::cout << " " << expression.tag 
 				<< "what are you trying to do to me lol \n\n\n";
 			break;
 		}
@@ -77,6 +78,7 @@ class SCADMIRLowering {
 
 
 	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
+	std::unordered_map<std::string, mlir::Value> variables;
 
     private:
 	mlir::DenseIntElementsAttr scad_matrix(FFIHIRArray arr) {
@@ -99,13 +101,19 @@ class SCADMIRLowering {
 	}
 
 	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
+		std::string name (decl.name.data, decl.name.size);
+		std::cout << name << "\n";
 		mlir::Location location = mlir::FileLineColLoc::get(
-			&context, std::string(decl.name.data, decl.name.size), 100, 100
+			&context, name, 100, 100
 		);
-
-		return builder.create<mlir::scad::VectorOp>(
+		auto r = builder.create<mlir::scad::VectorOp>(
 			location, scad_matrix(decl.e1.value.array)
 		);
+
+		variables[name] = r;
+
+		codegen(*decl.e2);
+		return r;
 	}
 
 	mlir::scad::FuncOp scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
@@ -168,7 +176,7 @@ class SCADMIRLowering {
 			function.setType(builder.getFunctionType(
 				function.getFunctionType().getInputs(),
 				mlir::RankedTensorType::get(
-					10, builder.getI32Type()
+					2, builder.getI32Type()
 				)
 			));
 		}
@@ -187,7 +195,13 @@ class SCADMIRLowering {
 			&context, std::string("RETURN STATEMENT!!!"), 100, 100
 		);
 
-		builder.create<mlir::scad::ReturnOp>(location);
+		std::string refer = std::string(ret.res.value.variable_reference.name.data, ret.res.value.variable_reference.name.size);
+		std::cout << refer << "=== \n";
+		// for (auto & x: variables) {
+		// 	std::cout << x.first << "=a=a\n";
+		// }
+
+		builder.create<mlir::scad::ReturnOp>(location, ArrayRef(variables[refer]));
 		return mlir::success();
 	}
 };

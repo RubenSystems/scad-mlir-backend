@@ -19,12 +19,17 @@ extern "C" {
 		size_t value;
 	};
 
-	union ValueUnion {
-		FFIHIRArray array;
-		FFIHIRInteger integer;
+	struct FFIHIRVariableReference {
+		struct FFIString name;
 	};
 
-	enum FFIHirValueTag { Array, Integer };
+	union ValueUnion {
+		struct FFIHIRArray array;
+		struct FFIHIRInteger integer;
+		struct FFIHIRVariableReference variable_reference;
+	};
+
+	enum FFIHirValueTag { Array = 0, Integer = 1, VariableReference = 2 };
 
 	struct FFIHIRValue {
 		FFIHirValueTag tag;
