@@ -6,7 +6,7 @@
 
 extern "C" {
 	struct FFIString {
-		const char * data; 
+		const char * data;
 		size_t size;
 	};
 
@@ -19,6 +19,12 @@ extern "C" {
 		size_t value;
 	};
 
+	struct FFIHIRFunctionCall {
+		struct FFIString func_name;
+		const struct FFIHIRValue * params;
+		size_t param_len;
+	};
+
 	struct FFIHIRVariableReference {
 		struct FFIString name;
 	};
@@ -27,13 +33,19 @@ extern "C" {
 		struct FFIHIRArray array;
 		struct FFIHIRInteger integer;
 		struct FFIHIRVariableReference variable_reference;
+		struct FFIHIRFunctionCall function_call;
 	};
 
-	enum FFIHirValueTag { Array = 0, Integer = 1, VariableReference = 2 };
+	enum FFIHirValueTag {
+		Array = 0,
+		Integer = 1,
+		VariableReference = 2,
+		FunctionCall = 3
+	};
 
 	struct FFIHIRValue {
-		FFIHirValueTag tag;
-		ValueUnion value;
+		enum FFIHirValueTag tag;
+		union ValueUnion value;
 	};
 
 	enum FFIHIRTag {

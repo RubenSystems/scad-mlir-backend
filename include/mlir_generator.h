@@ -61,11 +61,30 @@ class SCADMIRLowering {
 		case Return:
 			scad_return(expression.value.ret);
 			break;
-		case ForwardFunctionDecl: 
+		case ForwardFunctionDecl:
 			scad_func_prototype(expression.value.forward_func_decl);
 			break;
 		default:
-			std::cout << " " << expression.tag 
+			std::cout
+				<< " " << expression.tag
+				<< "what are you trying to do to me lol \n\n\n";
+			break;
+		}
+	}
+
+	mlir::Value codegen(FFIHIRValue value) {
+		switch (value.tag) {
+		case Array:
+			return scad_vector(value.value.array);
+		// case Integer:
+		// 	break;
+		case VariableReference:
+			return variables[std::string(value.value.variable_reference.name.data, value.value.variable_reference.name.size)];
+		case FunctionCall:
+			return scad_function_call(value.value.function_call);
+		default:
+			std::cout
+				<< " " << value.tag
 				<< "what are you trying to do to me lol \n\n\n";
 			break;
 		}
@@ -75,7 +94,6 @@ class SCADMIRLowering {
 	mlir::MLIRContext & context;
 	mlir::OpBuilder & builder;
 	mlir::ModuleOp & mod;
-
 
 	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
 	std::unordered_map<std::string, mlir::Value> variables;
@@ -100,20 +118,58 @@ class SCADMIRLowering {
 		);
 	}
 
-	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
-		std::string name (decl.name.data, decl.name.size);
-		std::cout << name << "\n";
+	mlir::Value scad_vector(FFIHIRArray arr) {
 		mlir::Location location = mlir::FileLineColLoc::get(
-			&context, name, 100, 100
+			&context,
+			"lololololol you though i would be helpful??!!?",
+			100,
+			100
 		);
-		auto r = builder.create<mlir::scad::VectorOp>(
-			location, scad_matrix(decl.e1.value.array)
+
+		return builder.create<mlir::scad::VectorOp>(
+			location, scad_matrix(arr)
 		);
+	}
+
+	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
+		std::string name(decl.name.data, decl.name.size);
+		std::cout << name << "\n";
+		mlir::Location location =
+			mlir::FileLineColLoc::get(&context, name, 100, 100);
+		// auto r = builder.create<mlir::scad::VectorOp>(
+		// 	location, scad_matrix(decl.e1.value.array)
+		// );
+		auto r = codegen(decl.e1);
 
 		variables[name] = r;
 
 		codegen(*decl.e2);
 		return r;
+	}
+
+	mlir::Value scad_function_call(FFIHIRFunctionCall fc) {
+		std::string fname (fc.func_name.data, fc.func_name.size);
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, fname, 100, 100
+		);
+
+		// Codegen the operands first.
+		SmallVector<mlir::Value, 4> operands;
+		for (size_t i = 0; i < fc.param_len; i ++) {
+			auto arg = codegen(fc.params[i]);
+			if (!arg)
+				return nullptr;
+			operands.push_back(arg);
+		}
+
+		return builder.create<mlir::scad::GenericCallOp>(
+			location,
+			mlir::RankedTensorType::get(
+				{ 2 }, builder.getI32Type()
+			),
+			mlir::SymbolRefAttr::get(builder.getContext(), fname),
+			operands
+		);
 	}
 
 	mlir::scad::FuncOp scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
@@ -130,9 +186,10 @@ class SCADMIRLowering {
 
 		builder.setInsertionPointToEnd(mod.getBody());
 
-		mlir::scad::FuncOp function = builder.create<mlir::scad::FuncOp>(
-			location, name, funcType
-		);
+		mlir::scad::FuncOp function =
+			builder.create<mlir::scad::FuncOp>(
+				location, name, funcType
+			);
 
 		functions[name] = function;
 
@@ -154,8 +211,6 @@ class SCADMIRLowering {
 			return nullptr;
 		}
 		auto function = res->second;
-			
-		
 
 		mlir::Block & entryBlock = function.front();
 		builder.setInsertionPointToStart(&entryBlock);
@@ -181,6 +236,7 @@ class SCADMIRLowering {
 			));
 		}
 
+		codegen(*decl.e2);
 		// If this function isn't main, then set the visibility to private.
 		// if (funcAST.getProto()->getName() != "main")
 		// 	function.setPrivate();
@@ -188,20 +244,23 @@ class SCADMIRLowering {
 		return function;
 	}
 
-	mlir::LogicalResult scad_return(
-		FFIHIRReturn ret
-	) {
+	mlir::LogicalResult scad_return(FFIHIRReturn ret) {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("RETURN STATEMENT!!!"), 100, 100
 		);
 
-		std::string refer = std::string(ret.res.value.variable_reference.name.data, ret.res.value.variable_reference.name.size);
+		std::string refer = std::string(
+			ret.res.value.variable_reference.name.data,
+			ret.res.value.variable_reference.name.size
+		);
 		std::cout << refer << "=== \n";
 		// for (auto & x: variables) {
 		// 	std::cout << x.first << "=a=a\n";
 		// }
 
-		builder.create<mlir::scad::ReturnOp>(location, ArrayRef(variables[refer]));
+		builder.create<mlir::scad::ReturnOp>(
+			location, ArrayRef(variables[refer])
+		);
 		return mlir::success();
 	}
 };
