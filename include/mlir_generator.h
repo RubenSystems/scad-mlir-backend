@@ -79,7 +79,10 @@ class SCADMIRLowering {
 		// case Integer:
 		// 	break;
 		case VariableReference:
-			return variables[std::string(value.value.variable_reference.name.data, value.value.variable_reference.name.size)];
+			return variables[std::string(
+				value.value.variable_reference.name.data,
+				value.value.variable_reference.name.size
+			)];
 		case FunctionCall:
 			return scad_function_call(value.value.function_call);
 		default:
@@ -99,6 +102,14 @@ class SCADMIRLowering {
 	std::unordered_map<std::string, mlir::Value> variables;
 
     private:
+	mlir::LogicalResult declare(std::string var, mlir::Value value) {
+		if (variables.find(var) != variables.end()) {
+			return mlir::failure();
+		}
+		variables[var] = value;
+		return mlir::success();
+	}
+
 	mlir::DenseIntElementsAttr scad_matrix(FFIHIRArray arr) {
 		std::vector<uint32_t> data;
 
@@ -148,14 +159,13 @@ class SCADMIRLowering {
 	}
 
 	mlir::Value scad_function_call(FFIHIRFunctionCall fc) {
-		std::string fname (fc.func_name.data, fc.func_name.size);
-		mlir::Location location = mlir::FileLineColLoc::get(
-			&context, fname, 100, 100
-		);
+		std::string fname(fc.func_name.data, fc.func_name.size);
+		mlir::Location location =
+			mlir::FileLineColLoc::get(&context, fname, 100, 100);
 
 		// Codegen the operands first.
 		SmallVector<mlir::Value, 4> operands;
-		for (size_t i = 0; i < fc.param_len; i ++) {
+		for (size_t i = 0; i < fc.param_len; i++) {
 			auto arg = codegen(fc.params[i]);
 			if (!arg)
 				return nullptr;
@@ -164,38 +174,34 @@ class SCADMIRLowering {
 
 		return builder.create<mlir::scad::GenericCallOp>(
 			location,
-			mlir::RankedTensorType::get(
-				{ 2 }, builder.getI32Type()
-			),
+			mlir::RankedTensorType::get({ 2 }, builder.getI32Type()),
 			mlir::SymbolRefAttr::get(builder.getContext(), fname),
 			operands
 		);
 	}
 
-	mlir::scad::FuncOp scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
+	void scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
+
+
+		codegen(*ffd.e2);
+
+	}
+
+	mlir::scad::FuncOp proto_gen(FFIHIRFunctionDecl ffd) {
 		std::string name = std::string(ffd.name.data, ffd.name.size);
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, name, 100, 100);
 
-		// This is a generic function, the return type will be inferred later.
-		// Arguments type are uniformly unranked tensors.
 		llvm::SmallVector<mlir::Type, 4> argTypes(
-			0, mlir::RankedTensorType::get(10, builder.getI32Type())
+			1, mlir::RankedTensorType::get(900, builder.getI32Type())
 		);
 		auto funcType = builder.getFunctionType(argTypes, std::nullopt);
+			
 
-		builder.setInsertionPointToEnd(mod.getBody());
 
-		mlir::scad::FuncOp function =
-			builder.create<mlir::scad::FuncOp>(
+		return builder.create<mlir::scad::FuncOp>(
 				location, name, funcType
 			);
-
-		functions[name] = function;
-
-		codegen(*ffd.e2);
-
-		return function;
 	}
 
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
@@ -204,19 +210,24 @@ class SCADMIRLowering {
 			mlir::FileLineColLoc::get(&context, name, 100, 100);
 		// Create an MLIR function for the given prototype.
 		builder.setInsertionPointToEnd(mod.getBody());
-		// mlir::scad::FuncOp function = scad_func_prototype(name);
-		auto res = functions.find(name);
-		if (res == functions.end()) {
-			std::cout << "CANT FIND FUNCTION\n\n";
-			return nullptr;
-		}
-		auto function = res->second;
+		auto function = proto_gen(decl);
 
 		mlir::Block & entryBlock = function.front();
+
+		// for (const auto nameValue :
+		//      llvm::zip(protoArgs, entryBlock.getArguments())) {
+		if (failed(declare("HI" + name, entryBlock.getArguments()[0]))) {
+			std::cout << "i failed you. srry";
+			return nullptr;
+		}
+		// }
 		builder.setInsertionPointToStart(&entryBlock);
+
+		// mlir::scad::FuncOp function = scad_func_prototype(name);
 
 		// Emit the body of the function.
 		codegen(*decl.block);
+		builder.setInsertionPointToEnd(mod.getBody());
 
 		mlir::scad::ReturnOp returnOp;
 		if (!entryBlock.empty())
