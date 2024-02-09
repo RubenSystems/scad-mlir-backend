@@ -65,6 +65,8 @@ extern "C" {
 	struct FFIHIRFunctionDecl {
 		struct FFIString name;
 		const struct FFIHIRExpr * block;
+		const struct FFIString * arg_names;
+		size_t arg_len;
 		const struct FFIHIRExpr * e2;
 	};
 

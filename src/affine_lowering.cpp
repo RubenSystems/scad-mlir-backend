@@ -40,8 +40,11 @@ static MemRefType convert_tensor_type_to_memref_type(RankedTensorType type) {
 }
 
 /// Insert an allocation and deallocation for the given MemRefType.
-static Value
-insertAllocAndDealloc(MemRefType type, Location loc, PatternRewriter & rewriter) {
+static Value insert_alloc_and_dealloc(
+	MemRefType type,
+	Location loc,
+	PatternRewriter & rewriter
+) {
 	auto alloc = rewriter.create<memref::AllocOp>(loc, type);
 
 	// Make sure to allocate at the beginning of the block.
@@ -76,7 +79,7 @@ static void lowerOpToLoops(
 
 	// Insert an allocation and deallocation for the result of this operation.
 	auto memRefType = convert_tensor_type_to_memref_type(tensorType);
-	auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
+	auto alloc = insert_alloc_and_dealloc(memRefType, loc, rewriter);
 
 	// Create a nest of affine loops, with one loop per dimension of the shape.
 	// The buildAffineLoopNest function takes a callback that is used to construct
@@ -121,7 +124,8 @@ struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 		auto tensorType = llvm::cast<RankedTensorType>(op.getType());
 		auto memRefType =
 			convert_tensor_type_to_memref_type(tensorType);
-		auto alloc = insertAllocAndDealloc(memRefType, loc, rewriter);
+		auto alloc =
+			insert_alloc_and_dealloc(memRefType, loc, rewriter);
 
 		// We will be generating constant indices up-to the largest dimension.
 		// Create these constants up-front to avoid large amounts of redundant
@@ -198,22 +202,45 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 		mlir::scad::FuncOpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-		op->setOperands(adaptor.getOperands());
-		auto func = rewriter.create<mlir::func::FuncOp>(
-			op.getLoc(), op.getName(), adaptor.getFunctionType()
+		auto res_type = adaptor.getFunctionType().getResults(
+		)[0]; // watch out it dosnt work for meore then one restype
+		auto result_type = llvm::cast<RankedTensorType>(res_type);
+
+		SmallVector<mlir::Type, 4> lowered_operands;
+		for (auto & input_type : op.getFunctionType().getInputs()) {
+			auto param_type =
+				llvm::cast<RankedTensorType>(input_type);
+			lowered_operands.push_back(
+				convert_tensor_type_to_memref_type(param_type)
+			);
+		}
+
+		auto function_type = rewriter.getFunctionType(
+			lowered_operands,
+			convert_tensor_type_to_memref_type(result_type)
 		);
 
-		if (adaptor.getFunctionType().getResults().size() > 0) {
-			auto res_type = adaptor.getFunctionType().getResults(
-			)[0]; // watch out it dosnt work for meore then one restype
-			auto tensor_type =
-				llvm::cast<RankedTensorType>(res_type);
+		auto func = rewriter.create<mlir::func::FuncOp>(
+			op.getLoc(), op.getName(), function_type
+		);
 
-			func.setType(rewriter.getFunctionType(
-				func.getFunctionType().getInputs(),
-				convert_tensor_type_to_memref_type(tensor_type)
-			));
+
+		mlir::Block & entry_block = op.front();
+		// mlir::Block & new_entry_block = func.front();
+
+		auto entry_args = entry_block.getArguments();
+		for (size_t i = 0; i < entry_args.size(); i++) {
+			auto arg_type = function_type.getInput(i);
+			entry_block.getArgument(i).setType(arg_type);
+
+			// auto new_arg = new_entry_block.addArgument(
+			// 	arg_type, arg.getLoc()
+			// );
+			// entry_block.eraseArgument(i);
+			// entry_block.insertArgument(i, arg_type, arg.getLoc());
+			// arg.replaceAllUsesWith(new_arg);
 		}
+
 
 		rewriter.inlineRegionBefore(
 			op.getRegion(), func.getBody(), func.end()
@@ -222,6 +249,7 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 		return success();
 	}
 };
+
 
 struct PrintOpLowering : public OpConversionPattern<scad::PrintOp> {
 	using OpConversionPattern<scad::PrintOp>::OpConversionPattern;
@@ -268,23 +296,31 @@ struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 		StringRef callee = op.getCalleeAttrName();
 
 		auto inputs = adaptor.getInputs();
-		auto tensor_type =
+		auto input_type =
 			llvm::cast<RankedTensorType>((*op->result_type_begin())
 			);
+		// Lower operands
+		SmallVector<mlir::Value, 4> loweredOperands;
+		for (Value operand : op.getOperands()) {
+			auto tensor_type =
+				llvm::cast<RankedTensorType>(operand.getType());
+			auto mr_type =
+				convert_tensor_type_to_memref_type(tensor_type);
+			loweredOperands.push_back(insert_alloc_and_dealloc(
+				mr_type, op.getLoc(), rewriter
+			));
+		}
 
 		auto call_op = rewriter.create<func::CallOp>(
 			op.getLoc(),
 			callee,
-			// adaptor.getOperands().getFunctionType(),
-			// MemRefType::get({ 1, 3, 2 }, rewriter.getI32Type()),
-			convert_tensor_type_to_memref_type(tensor_type),
-
-			// adaptor.getFunctionType(),
-			adaptor.getOperands()
+			convert_tensor_type_to_memref_type(input_type),
+			loweredOperands
 		);
 		call_op->setAttrs(op->getAttrs());
 
 		rewriter.eraseOp(op);
+
 		return success();
 	}
 };

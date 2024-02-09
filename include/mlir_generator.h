@@ -160,8 +160,9 @@ class SCADMIRLowering {
 
 	mlir::Value scad_function_call(FFIHIRFunctionCall fc) {
 		std::string fname(fc.func_name.data, fc.func_name.size);
-		mlir::Location location =
-			mlir::FileLineColLoc::get(&context, fname, 100, 100);
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, fname + "Call", 100, 100
+		);
 
 		// Codegen the operands first.
 		SmallVector<mlir::Value, 4> operands;
@@ -181,49 +182,49 @@ class SCADMIRLowering {
 	}
 
 	void scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
-
-
 		codegen(*ffd.e2);
-
 	}
 
 	mlir::scad::FuncOp proto_gen(FFIHIRFunctionDecl ffd) {
 		std::string name = std::string(ffd.name.data, ffd.name.size);
 		mlir::Location location =
-			mlir::FileLineColLoc::get(&context, name, 100, 100);
+			mlir::FileLineColLoc::get(&context, name + "PROTO", 100, 100);
 
 		llvm::SmallVector<mlir::Type, 4> argTypes(
-			1, mlir::RankedTensorType::get(900, builder.getI32Type())
+			ffd.arg_len,
+			mlir::RankedTensorType::get(2, builder.getI32Type())
 		);
 		auto funcType = builder.getFunctionType(argTypes, std::nullopt);
-			
-
 
 		return builder.create<mlir::scad::FuncOp>(
-				location, name, funcType
-			);
+			location, name, funcType
+		);
 	}
 
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
 		std::string name = std::string(decl.name.data, decl.name.size);
-		mlir::Location location =
-			mlir::FileLineColLoc::get(&context, name, 100, 100);
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, name + " Decl", 100, 100
+		);
 		// Create an MLIR function for the given prototype.
 		builder.setInsertionPointToEnd(mod.getBody());
 		auto function = proto_gen(decl);
 
 		mlir::Block & entryBlock = function.front();
 
-		// for (const auto nameValue :
-		//      llvm::zip(protoArgs, entryBlock.getArguments())) {
-		if (failed(declare("HI" + name, entryBlock.getArguments()[0]))) {
-			std::cout << "i failed you. srry";
-			return nullptr;
+		for (size_t i = 0; i < decl.arg_len; i++) {
+			if (failed(
+				    declare(std::string(
+						    decl.arg_names[i].data,
+						    decl.arg_names[i].size
+					    ),
+					    entryBlock.getArguments()[0])
+			    )) {
+				std::cout << "i failed you. srry";
+				return nullptr;
+			}
 		}
-		// }
 		builder.setInsertionPointToStart(&entryBlock);
-
-		// mlir::scad::FuncOp function = scad_func_prototype(name);
 
 		// Emit the body of the function.
 		codegen(*decl.block);
@@ -264,10 +265,6 @@ class SCADMIRLowering {
 			ret.res.value.variable_reference.name.data,
 			ret.res.value.variable_reference.name.size
 		);
-		std::cout << refer << "=== \n";
-		// for (auto & x: variables) {
-		// 	std::cout << x.first << "=a=a\n";
-		// }
 
 		builder.create<mlir::scad::ReturnOp>(
 			location, ArrayRef(variables[refer])
