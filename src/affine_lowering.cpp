@@ -63,51 +63,51 @@ static Value insert_alloc_and_dealloc(
 /// corresponding to the operands of the input operation, and the range of loop
 /// induction variables for the iteration. It returns a value to store at the
 /// current index of the iteration.
-using LoopIterationFn = function_ref<
-	Value(OpBuilder & rewriter, ValueRange memRefOperands, ValueRange loopIvs
-	)>;
+// using LoopIterationFn = function_ref<
+// 	Value(OpBuilder & rewriter, ValueRange memRefOperands, ValueRange loopIvs
+// 	)>;
 
-static void lowerOpToLoops(
-	Operation * op,
-	ValueRange operands,
-	PatternRewriter & rewriter,
-	LoopIterationFn processIteration
-) {
-	auto tensorType =
-		llvm::cast<RankedTensorType>((*op->result_type_begin()));
-	auto loc = op->getLoc();
+// static void lowerOpToLoops(
+// 	Operation * op,
+// 	ValueRange operands,
+// 	PatternRewriter & rewriter,
+// 	LoopIterationFn processIteration
+// ) {
+// 	auto tensorType =
+// 		llvm::cast<RankedTensorType>((*op->result_type_begin()));
+// 	auto loc = op->getLoc();
 
-	// Insert an allocation and deallocation for the result of this operation.
-	auto memRefType = convert_tensor_type_to_memref_type(tensorType);
-	auto alloc = insert_alloc_and_dealloc(memRefType, loc, rewriter);
+// 	// Insert an allocation and deallocation for the result of this operation.
+// 	auto memRefType = convert_tensor_type_to_memref_type(tensorType);
+// 	auto alloc = insert_alloc_and_dealloc(memRefType, loc, rewriter);
 
-	// Create a nest of affine loops, with one loop per dimension of the shape.
-	// The buildAffineLoopNest function takes a callback that is used to construct
-	// the body of the innermost loop given a builder, a location and a range of
-	// loop induction variables.
-	SmallVector<int64_t, 4> lowerBounds(tensorType.getRank(), /*Value=*/0);
-	SmallVector<int64_t, 4> steps(tensorType.getRank(), /*Value=*/1);
-	affine::buildAffineLoopNest(
-		rewriter,
-		loc,
-		lowerBounds,
-		tensorType.getShape(),
-		steps,
-		[&](OpBuilder & nestedBuilder, Location loc, ValueRange ivs) {
-			// Call the processing function with the rewriter, the memref operands,
-			// and the loop induction variables. This function will return the value
-			// to store at the current index.
-			Value valueToStore =
-				processIteration(nestedBuilder, operands, ivs);
-			nestedBuilder.create<affine::AffineStoreOp>(
-				loc, valueToStore, alloc, ivs
-			);
-		}
-	);
+// 	// Create a nest of affine loops, with one loop per dimension of the shape.
+// 	// The buildAffineLoopNest function takes a callback that is used to construct
+// 	// the body of the innermost loop given a builder, a location and a range of
+// 	// loop induction variables.
+// 	SmallVector<int64_t, 4> lowerBounds(tensorType.getRank(), /*Value=*/0);
+// 	SmallVector<int64_t, 4> steps(tensorType.getRank(), /*Value=*/1);
+// 	affine::buildAffineLoopNest(
+// 		rewriter,
+// 		loc,
+// 		lowerBounds,
+// 		tensorType.getShape(),
+// 		steps,
+// 		[&](OpBuilder & nestedBuilder, Location loc, ValueRange ivs) {
+// 			// Call the processing function with the rewriter, the memref operands,
+// 			// and the loop induction variables. This function will return the value
+// 			// to store at the current index.
+// 			Value valueToStore =
+// 				processIteration(nestedBuilder, operands, ivs);
+// 			nestedBuilder.create<affine::AffineStoreOp>(
+// 				loc, valueToStore, alloc, ivs
+// 			);
+// 		}
+// 	);
 
-	// Replace this operation with the generated alloc.
-	rewriter.replaceOp(op, alloc);
-}
+// 	// Replace this operation with the generated alloc.
+// 	rewriter.replaceOp(op, alloc);
+// }
 
 struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 	using OpRewritePattern<scad::VectorOp>::OpRewritePattern;
@@ -224,7 +224,6 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 			op.getLoc(), op.getName(), function_type
 		);
 
-
 		mlir::Block & entry_block = op.front();
 		// mlir::Block & new_entry_block = func.front();
 
@@ -232,15 +231,7 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 		for (size_t i = 0; i < entry_args.size(); i++) {
 			auto arg_type = function_type.getInput(i);
 			entry_block.getArgument(i).setType(arg_type);
-
-			// auto new_arg = new_entry_block.addArgument(
-			// 	arg_type, arg.getLoc()
-			// );
-			// entry_block.eraseArgument(i);
-			// entry_block.insertArgument(i, arg_type, arg.getLoc());
-			// arg.replaceAllUsesWith(new_arg);
 		}
-
 
 		rewriter.inlineRegionBefore(
 			op.getRegion(), func.getBody(), func.end()
@@ -249,7 +240,6 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 		return success();
 	}
 };
-
 
 struct PrintOpLowering : public OpConversionPattern<scad::PrintOp> {
 	using OpConversionPattern<scad::PrintOp>::OpConversionPattern;
@@ -300,22 +290,20 @@ struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 			llvm::cast<RankedTensorType>((*op->result_type_begin())
 			);
 		// Lower operands
-		SmallVector<mlir::Value, 4> loweredOperands;
-		for (Value operand : op.getOperands()) {
-			auto tensor_type =
-				llvm::cast<RankedTensorType>(operand.getType());
-			auto mr_type =
-				convert_tensor_type_to_memref_type(tensor_type);
-			loweredOperands.push_back(insert_alloc_and_dealloc(
-				mr_type, op.getLoc(), rewriter
-			));
-		}
+		// SmallVector<mlir::Value, 4> loweredOperands;
+		// for (Value operand : op.getOperands()) {
+		// 	auto tensor_type =
+		// 		llvm::cast<RankedTensorType>(operand.getType());
+		// 	auto mr_type =
+		// 		convert_tensor_type_to_memref_type(tensor_type);
+		// 	loweredOperands.push_back(operand);
+		// }
 
 		auto call_op = rewriter.create<func::CallOp>(
 			op.getLoc(),
 			callee,
 			convert_tensor_type_to_memref_type(input_type),
-			loweredOperands
+			adaptor.getOperands()
 		);
 		call_op->setAttrs(op->getAttrs());
 

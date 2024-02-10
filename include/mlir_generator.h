@@ -160,6 +160,7 @@ class SCADMIRLowering {
 
 	mlir::Value scad_function_call(FFIHIRFunctionCall fc) {
 		std::string fname(fc.func_name.data, fc.func_name.size);
+
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, fname + "Call", 100, 100
 		);
@@ -173,6 +174,10 @@ class SCADMIRLowering {
 			operands.push_back(arg);
 		}
 
+		if (fname[0] == '@') {
+			return inbuilt_op(fname, fc, operands);
+		}
+
 		return builder.create<mlir::scad::GenericCallOp>(
 			location,
 			mlir::RankedTensorType::get({ 2 }, builder.getI32Type()),
@@ -181,14 +186,23 @@ class SCADMIRLowering {
 		);
 	}
 
+	mlir::Value scad_print(mlir::Value arg) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, std::string("pritops"), 100, 100
+		);
+		builder.create<mlir::scad::PrintOp>(location, arg);
+		return arg;
+	}
+
 	void scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
 		codegen(*ffd.e2);
 	}
 
 	mlir::scad::FuncOp proto_gen(FFIHIRFunctionDecl ffd) {
 		std::string name = std::string(ffd.name.data, ffd.name.size);
-		mlir::Location location =
-			mlir::FileLineColLoc::get(&context, name + "PROTO", 100, 100);
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, name + "PROTO", 100, 100
+		);
 
 		llvm::SmallVector<mlir::Type, 4> argTypes(
 			ffd.arg_len,
@@ -201,8 +215,19 @@ class SCADMIRLowering {
 		);
 	}
 
+	mlir::Value inbuilt_op(
+		std::string & name,
+		FFIHIRFunctionCall fc,
+		SmallVector<mlir::Value, 4> operands
+	) {
+		if (name == "@print") {
+			return scad_print(operands[0]);
+		}
+	}
+
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
 		std::string name = std::string(decl.name.data, decl.name.size);
+
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, name + " Decl", 100, 100
 		);

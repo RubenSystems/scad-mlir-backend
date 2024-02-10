@@ -94,7 +94,7 @@ def ReturnOp : Scad_Op<"return", [Pure, HasParent<"FuncOp">,
 }
 
 def GenericCallOp : Scad_Op<"generic_call",
-    [DeclareOpInterfaceMethods<CallOpInterface>]> {
+    [Pure, DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "generic call operation";
 
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32Tensor>:$inputs);
