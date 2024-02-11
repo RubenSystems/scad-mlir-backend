@@ -183,7 +183,7 @@ void AddOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 
 /// Infer the output shape of the AddOp, this is required by the shape inference
 /// interface.
-void AddOp::inferShapes() { getResult().setType(getLhs().getType()); }
+// void AddOp::inferShapes() { getResult().setType(getLhs().getType()); }
 
 
 

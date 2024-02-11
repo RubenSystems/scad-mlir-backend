@@ -5,7 +5,6 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-include "ShapeInferenceInterface.td"
 
 
 def SCAD_Dialect : Dialect {
@@ -122,7 +121,7 @@ def PrintOp : Scad_Op<"print"> {
 
 
 def AddOp : Scad_Op<"add",
-    [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
+    [Pure]> {
   let summary = "element-wise addition operation";
 
   let arguments = (ins I32Tensor:$lhs, I32Tensor:$rhs);
