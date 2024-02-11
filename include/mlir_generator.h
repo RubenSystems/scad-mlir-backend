@@ -222,7 +222,19 @@ class SCADMIRLowering {
 	) {
 		if (name == "@print") {
 			return scad_print(operands[0]);
+		} else if (name == "@add") {
+			return scad_add(operands[0], operands[1]);
 		}
+	}
+
+	mlir::Value scad_add(mlir::Value lhs, mlir::Value rhs) {
+		mlir::Location location =
+			mlir::FileLineColLoc::get(&context, "add_op", 100, 100);
+
+
+		return builder.create<mlir::scad::AddOp>(location, mlir::RankedTensorType::get(
+					2, builder.getI32Type()
+				), lhs, rhs);
 	}
 
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {

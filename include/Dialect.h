@@ -7,6 +7,7 @@
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "ShapeInferenceInterface.h"
 
 #include "Dialect.h.inc"
 

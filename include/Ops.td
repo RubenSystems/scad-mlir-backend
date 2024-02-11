@@ -5,6 +5,8 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "ShapeInferenceInterface.td"
+
 
 def SCAD_Dialect : Dialect {
   let name = "scad";
@@ -116,6 +118,23 @@ def PrintOp : Scad_Op<"print"> {
   let arguments = (ins AnyTypeOf<[I32Tensor, I32MemRef]>:$input);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
+}
+
+
+def AddOp : Scad_Op<"add",
+    [Pure, DeclareOpInterfaceMethods<ShapeInferenceOpInterface>]> {
+  let summary = "element-wise addition operation";
+
+  let arguments = (ins I32Tensor:$lhs, I32Tensor:$rhs);
+  let results = (outs I32Tensor);
+
+  // Indicate that the operation has a custom parser and printer method.
+  // let hasCustomAssemblyFormat = 1;
+
+  // Allow building an AddOp with from the two input operands.
+  let builders = [
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
+  ];
 }
 
 
