@@ -117,10 +117,9 @@ int main() {
 
 	owned_mod->dump();
 
-	mlir::OpPassManager & optPM = pm.nest<mlir::scad::FuncOp>();
-	optPM.addPass(mlir::createCanonicalizerPass());
-	optPM.addPass(mlir::createCanonicalizerPass());
-	optPM.addPass(mlir::createCSEPass());
+	// mlir::OpPassManager & optPM = pm.nest<mlir::scad::FuncOp>();
+	// optPM.addPass(mlir::createCanonicalizerPass());
+	pm.addPass(mlir::createCSEPass());
 
 	pm.addPass(mlir::scad::createLowerToAffinePass());
 	if (mlir::failed(pm.run(*owned_mod))) {

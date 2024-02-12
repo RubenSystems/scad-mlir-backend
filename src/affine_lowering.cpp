@@ -309,21 +309,18 @@ struct PrintOpLowering : public OpConversionPattern<scad::PrintOp> {
 	}
 };
 
-struct ReturnOpLowering : public ConversionPattern {
-	ReturnOpLowering(MLIRContext * ctx)
-		: ConversionPattern(
-			  mlir::scad::ReturnOp::getOperationName(),
-			  1,
-			  ctx
-		  ) {
-	}
+struct ReturnOpLowering : public OpConversionPattern<scad::ReturnOp> {
+	using OpConversionPattern<scad::ReturnOp>::OpConversionPattern;
+
 	LogicalResult matchAndRewrite(
-		Operation * op,
-		ArrayRef<Value> operands,
+		scad::ReturnOp op,
+		OpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-		rewriter.create<func::ReturnOp>(op->getLoc(), operands);
-		rewriter.eraseOp(op);
+		rewriter.replaceOpWithNewOp<func::ReturnOp>(
+			op, adaptor.getOperands()
+		);
+
 		return success();
 	}
 };
@@ -343,15 +340,15 @@ struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 			llvm::cast<RankedTensorType>((*op->result_type_begin())
 			);
 
-		auto call_op = rewriter.create<func::CallOp>(
-			op.getLoc(),
+		auto call_op = rewriter.replaceOpWithNewOp<func::CallOp>(
+			op,
 			callee,
 			convert_tensor_type_to_memref_type(input_type),
 			adaptor.getOperands()
 		);
 		call_op->setAttrs(op->getAttrs());
 
-		rewriter.eraseOp(op);
+		// rewriter.eraseOp(op);
 
 		return success();
 	}
