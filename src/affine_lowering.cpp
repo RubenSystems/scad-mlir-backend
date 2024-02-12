@@ -129,7 +129,7 @@ struct BinaryOpLowering : public ConversionPattern {
     return success();
   }
 };
-using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddFOp>;
+using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddIOp>;
 
 struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 	using OpRewritePattern<scad::VectorOp>::OpRewritePattern;
@@ -271,7 +271,7 @@ struct PrintOpLowering : public OpConversionPattern<scad::PrintOp> {
 		OpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-		rewriter.updateRootInPlace(op, [&] {
+		rewriter.modifyOpInPlace(op, [&] {
 			op->setOperands(adaptor.getOperands());
 		});
 		return success();

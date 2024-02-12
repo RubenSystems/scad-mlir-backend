@@ -56,13 +56,12 @@ DEPENDS
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
-get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+# get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 get_property(extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
 
 target_link_libraries(scadc
 	PRIVATE
 		${dialect_libs}
-		${extension_libs}
 		${extension_libs}
 		${SCAD_FRONTEND}
 		MLIRAnalysis
