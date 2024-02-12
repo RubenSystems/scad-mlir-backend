@@ -168,24 +168,24 @@ MutableOperandRange GenericCallOp::getArgOperandsMutable() {
 	return getInputsMutable();
 }
 
-
-
 /*
 ===
 Add Operation
 ===
 */
-void AddOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                  mlir::Value lhs, mlir::Value rhs) {
-  state.addTypes(UnrankedTensorType::get(builder.getI32Type()));
-  state.addOperands({lhs, rhs});
+void AddOp::build(
+	mlir::OpBuilder & builder,
+	mlir::OperationState & state,
+	mlir::Value lhs,
+	mlir::Value rhs
+) {
+	state.addTypes(UnrankedTensorType::get(builder.getI32Type()));
+	state.addOperands({ lhs, rhs });
 }
 
 /// Infer the output shape of the AddOp, this is required by the shape inference
 /// interface.
 // void AddOp::inferShapes() { getResult().setType(getLhs().getType()); }
-
-
 
 #define GET_OP_CLASSES
 #include "Ops.cpp.inc"

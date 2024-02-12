@@ -231,10 +231,12 @@ class SCADMIRLowering {
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, "add_op", 100, 100);
 
-
-		return builder.create<mlir::scad::AddOp>(location, mlir::RankedTensorType::get(
-					2, builder.getI32Type()
-				), lhs, rhs);
+		return builder.create<mlir::scad::AddOp>(
+			location,
+			mlir::RankedTensorType::get(2, builder.getI32Type()),
+			lhs,
+			rhs
+		);
 	}
 
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
