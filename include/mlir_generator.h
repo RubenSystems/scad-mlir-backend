@@ -165,6 +165,9 @@ class SCADMIRLowering {
 			&context, fname + "Call", 100, 100
 		);
 
+		if (fname[0] == '@') {
+			return inbuilt_op(fname, fc);
+		}
 		// Codegen the operands first.
 		SmallVector<mlir::Value, 4> operands;
 		for (size_t i = 0; i < fc.param_len; i++) {
@@ -172,10 +175,6 @@ class SCADMIRLowering {
 			if (!arg)
 				return nullptr;
 			operands.push_back(arg);
-		}
-
-		if (fname[0] == '@') {
-			return inbuilt_op(fname, fc, operands);
 		}
 
 		return builder.create<mlir::scad::GenericCallOp>(
@@ -186,12 +185,21 @@ class SCADMIRLowering {
 		);
 	}
 
-	mlir::Value scad_print(mlir::Value arg) {
+	mlir::Value scad_print(FFIHIRFunctionCall fc) {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("pritops"), 100, 100
 		);
-		builder.create<mlir::scad::PrintOp>(location, arg);
-		return arg;
+		// Codegen the operands first.
+		SmallVector<mlir::Value, 4> operands;
+		for (size_t i = 0; i < fc.param_len; i++) {
+			auto arg = codegen(fc.params[i]);
+			if (!arg)
+				return nullptr;
+			operands.push_back(arg);
+		}
+
+		builder.create<mlir::scad::PrintOp>(location, operands[0]);
+		return operands[0];
 	}
 
 	void scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
@@ -215,27 +223,56 @@ class SCADMIRLowering {
 		);
 	}
 
-	mlir::Value inbuilt_op(
-		std::string & name,
-		FFIHIRFunctionCall fc,
-		SmallVector<mlir::Value, 4> operands
-	) {
+	mlir::Value inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		if (name == "@print") {
-			return scad_print(operands[0]);
+			return scad_print(fc);
 		} else if (name == "@add") {
-			return scad_add(operands[0], operands[1]);
+			return scad_add(fc);
+		} else if (name == "@index") {
+			return scad_index(fc);
 		}
 	}
 
-	mlir::Value scad_add(mlir::Value lhs, mlir::Value rhs) {
+	mlir::Value scad_add(FFIHIRFunctionCall fc) {
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, "add_op", 100, 100);
+
+		// Codegen the operands first.
+		SmallVector<mlir::Value, 4> operands;
+		for (size_t i = 0; i < fc.param_len; i++) {
+			auto arg = codegen(fc.params[i]);
+			if (!arg)
+				return nullptr;
+			operands.push_back(arg);
+		}
 
 		return builder.create<mlir::scad::AddOp>(
 			location,
 			mlir::RankedTensorType::get(2, builder.getI32Type()),
-			lhs,
-			rhs
+			operands[0],
+			operands[1]
+		);
+	}
+
+	mlir::Value scad_index(FFIHIRFunctionCall fc) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, "index_op", 100, 100
+		);
+
+		// Codegen the operands first.
+		SmallVector<mlir::Value, 4> operands;
+		for (size_t i = 0; i < fc.param_len; i++) {
+			auto arg = codegen(fc.params[i]);
+			if (!arg)
+				return nullptr;
+			operands.push_back(arg);
+		}
+
+		return builder.create<mlir::scad::IndexOp>(
+			location,
+			mlir::RankedTensorType::get(1, builder.getI32Type()),
+			operands[0],
+			operands[1]
 		);
 	}
 

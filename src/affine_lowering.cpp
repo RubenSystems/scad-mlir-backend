@@ -325,6 +325,27 @@ struct ReturnOpLowering : public OpConversionPattern<scad::ReturnOp> {
 	}
 };
 
+struct IndexOpLowering : public OpConversionPattern<scad::IndexOp> {
+	using OpConversionPattern<scad::IndexOp>::OpConversionPattern;
+
+	LogicalResult matchAndRewrite(
+		scad::IndexOp op,
+		OpAdaptor adaptor,
+		ConversionPatternRewriter & rewriter
+	) const final {
+		auto memRefType = convert_tensor_type_to_memref_type(
+			llvm::cast<RankedTensorType>(op.getValue().getType())
+		);
+		SmallVector<Value, 8> constant_indicies;
+		constant_indicies.push_back(rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0));
+		auto memRef = rewriter.replaceOpWithNewOp<affine::AffineLoadOp>( 
+			op, adaptor.getValue(), llvm::ArrayRef(constant_indicies)
+		);
+
+		return success();
+	}
+};
+
 struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 	using OpConversionPattern<mlir::scad::GenericCallOp>::OpConversionPattern;
 
@@ -396,6 +417,7 @@ void SCADToAffineLoweringPass::runOnOperation() {
 		     ReturnOpLowering,
 		     CallOpLowering,
 		     AddOpLowering,
+		     IndexOpLowering,
 		     PrintOpLowering>(&getContext());
 
 	if (failed(applyPartialConversion(

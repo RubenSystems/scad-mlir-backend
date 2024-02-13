@@ -138,4 +138,25 @@ def AddOp : Scad_Op<"add",
 
 
 
+def IndexOp : Scad_Op<"index",
+    [Pure]> {
+  let summary = "Get element from tensor at index";
+
+  let arguments = (ins I32Tensor:$value, I32Tensor:$index);
+  let results = (outs I32Tensor);
+
+  let builders = [
+    OpBuilder<(ins "Value":$value, "Value":$index)>
+  ];
+
+  // let builders = [
+  //       OpBuilder<(ins "DenseIntElementsAttr":$value, "DenseIntElementsAttr":$index), [{
+  //       build($_builder, $_state, value.getType(), value, index.getType(), index);
+  //     }]>,
+
+  // ];
+}
+
+
+
 #endif // SCAD_OPS

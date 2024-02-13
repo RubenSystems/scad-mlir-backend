@@ -183,9 +183,23 @@ void AddOp::build(
 	state.addOperands({ lhs, rhs });
 }
 
-/// Infer the output shape of the AddOp, this is required by the shape inference
-/// interface.
-// void AddOp::inferShapes() { getResult().setType(getLhs().getType()); }
+/*
+===
+Index Operation
+===
+*/
+// void IndexOp::build(
+// 	mlir::OpBuilder & builder,
+// 	mlir::OperationState & state,
+// 	RankedTensorType value,
+// 	DenseIntElementsAttr value_attr,
+// 	RankedTensorType index,
+// 	DenseIntElementsAttr index_attr,
+// ) {
+// // 	// auto dataType = RankedTensorType::get({}, builder.getI32Type());
+// // 	// auto dataAttribute = DenseIntElementsAttr::get(dataType, value);
+// // 	// VectorOp::build(builder, state, dataType, dataAttribute);
+// }
 
 #define GET_OP_CLASSES
 #include "Ops.cpp.inc"
