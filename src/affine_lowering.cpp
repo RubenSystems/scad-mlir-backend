@@ -337,10 +337,28 @@ struct IndexOpLowering : public OpConversionPattern<scad::IndexOp> {
 			llvm::cast<RankedTensorType>(op.getValue().getType())
 		);
 		SmallVector<Value, 8> constant_indicies;
-		constant_indicies.push_back(rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0));
-		auto memRef = rewriter.replaceOpWithNewOp<affine::AffineLoadOp>( 
-			op, adaptor.getValue(), llvm::ArrayRef(constant_indicies)
+		constant_indicies.push_back(
+			rewriter.create<arith::ConstantIndexOp>(
+				op.getLoc(), 1000
+			)
 		);
+		auto memRef = rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(
+			op,
+			adaptor.getValue(),
+			llvm::ArrayRef(constant_indicies)
+		);
+
+		// auto alloc =
+		// 	insert_alloc_and_dealloc(MemRefType::get({2}, op.getValue().getType().getElementType()), op.getLoc(), rewriter);
+
+		// rewriter.create<affine::AffineStoreOp>(
+		// 	op.getLoc(),
+		// 	adaptor.getValue(),
+		// 	alloc,
+		// 	llvm::ArrayRef(constant_indicies)
+		// );
+
+		// rewriter.replaceOp(op, alloc);
 
 		return success();
 	}

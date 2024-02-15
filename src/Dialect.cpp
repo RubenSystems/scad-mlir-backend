@@ -69,6 +69,36 @@ mlir::LogicalResult VectorOp::verify() {
 
 /*
 ==
+  Cond Op 
+==
+*/
+
+void ConditionalOp::build(
+	mlir::OpBuilder &builder, 
+	mlir::OperationState &state, 
+	bool cond
+) {
+	mlir::Region * if_region = state.addRegion();
+    mlir::Block * if_body = new Block();
+	if_region->push_back(if_body);
+
+	mlir::Region * else_region = state.addRegion();
+    mlir::Block * else_block = new Block();
+	else_region->push_back(else_block);
+
+	auto res_type = RankedTensorType::get({2}, builder.getI32Type());
+
+
+	state.getOrAddProperties<Properties>().condition = builder.getIntegerAttr(builder.getIntegerType(1), cond);
+
+	state.addTypes(res_type);
+
+	
+}
+
+
+/*
+==
   Function Op 
 ==
 */
@@ -188,6 +218,15 @@ void AddOp::build(
 Index Operation
 ===
 */
+
+// void VectorOp::build(
+// 	mlir::OpBuilder & builder,
+// 	mlir::OperationState & state,
+// 	bool value
+// ) {
+// 	VectorOp::build(builder, state, dataType, dataAttribute);
+// }
+
 // void IndexOp::build(
 // 	mlir::OpBuilder & builder,
 // 	mlir::OperationState & state,

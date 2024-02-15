@@ -64,13 +64,40 @@ def FuncOp : Scad_Op<"fn", [
     Region *getCallableRegion() { return &getBody(); }
   }];
 
-  let builders = [OpBuilder<(ins
-    "StringRef":$name, "FunctionType":$type,
-    CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)
-  >];
+  let builders = [
+    OpBuilder<(ins "StringRef":$name, "FunctionType":$type, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>
+  ];
 
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;
+}
+
+
+/*
+=============
+Conditional op 
+=============
+*/ 
+def ConditionalOp : Scad_Op<"cond", [Pure]> {
+  let summary = "if this then that else that";
+
+
+  let arguments = (ins
+    I1Attr:$condition
+  );
+  let results = (outs I32Tensor);
+  let regions = (region 
+    AnyRegion:$if_arm, 
+    AnyRegion:$else_arm
+  );
+
+  let builders = [
+    // OpBuilder<(ins "DenseIntElementsAttr":$condition), [{build($_builder, $_state, condition.getType(), condition;}]>,
+    OpBuilder<(ins "bool":$condition)>
+  ];
+
+  // let skipDefaultBuilders = 1;
+
 }
 
 
@@ -143,7 +170,7 @@ def IndexOp : Scad_Op<"index",
   let summary = "Get element from tensor at index";
 
   let arguments = (ins I32Tensor:$value, I32Tensor:$index);
-  let results = (outs I32Tensor);
+  let results = (outs I32);
 
   let builders = [
     OpBuilder<(ins "Value":$value, "Value":$index)>

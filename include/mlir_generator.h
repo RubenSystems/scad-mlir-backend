@@ -64,6 +64,9 @@ class SCADMIRLowering {
 		case ForwardFunctionDecl:
 			scad_func_prototype(expression.value.forward_func_decl);
 			break;
+		case Conditional: 
+			scad_conditional(expression.value.conditional);
+			break;
 		default:
 			std::cout
 				<< " " << expression.tag
@@ -74,8 +77,8 @@ class SCADMIRLowering {
 
 	mlir::Value codegen(FFIHIRValue value) {
 		switch (value.tag) {
-		case Array:
-			return scad_vector(value.value.array);
+		case Tensor:
+			return scad_vector(value.value.tensor);
 		// case Integer:
 		// 	break;
 		case VariableReference:
@@ -110,7 +113,7 @@ class SCADMIRLowering {
 		return mlir::success();
 	}
 
-	mlir::DenseIntElementsAttr scad_matrix(FFIHIRArray arr) {
+	mlir::DenseIntElementsAttr scad_matrix(FFIHIRTensor arr) {
 		std::vector<uint32_t> data;
 
 		for (size_t i = 0; i < arr.size; i++) {
@@ -129,7 +132,7 @@ class SCADMIRLowering {
 		);
 	}
 
-	mlir::Value scad_vector(FFIHIRArray arr) {
+	mlir::Value scad_vector(FFIHIRTensor arr) {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context,
 			"lololololol you though i would be helpful??!!?",
@@ -185,6 +188,30 @@ class SCADMIRLowering {
 		);
 	}
 
+	mlir::Value scad_conditional(FFIHIRConditional cond) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, std::string("cond"), 100, 100
+		);
+		// builder.setInsertionPointToEnd(mod.getBody());
+		auto scond = builder.create<mlir::scad::ConditionalOp>(location, true);
+
+		auto if_arm = &scond.getIfArm().front();
+		auto else_arm = &scond.getElseArm().front();
+
+
+		builder.setInsertionPointToStart(if_arm);
+		codegen(*cond.if_arm.block);
+		builder.create<mlir::scad::ReturnOp>(location);
+		builder.setInsertionPointToStart(else_arm);
+		codegen(*cond.else_arm);
+		builder.create<mlir::scad::ReturnOp>(location);
+		builder.setInsertionPointAfter(scond);
+
+		codegen(*cond.e2);
+
+		return scond;
+	}
+
 	mlir::Value scad_print(FFIHIRFunctionCall fc) {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("pritops"), 100, 100
@@ -206,22 +233,6 @@ class SCADMIRLowering {
 		codegen(*ffd.e2);
 	}
 
-	mlir::scad::FuncOp proto_gen(FFIHIRFunctionDecl ffd) {
-		std::string name = std::string(ffd.name.data, ffd.name.size);
-		mlir::Location location = mlir::FileLineColLoc::get(
-			&context, name + "PROTO", 100, 100
-		);
-
-		llvm::SmallVector<mlir::Type, 4> argTypes(
-			ffd.arg_len,
-			mlir::RankedTensorType::get(2, builder.getI32Type())
-		);
-		auto funcType = builder.getFunctionType(argTypes, std::nullopt);
-
-		return builder.create<mlir::scad::FuncOp>(
-			location, name, funcType
-		);
-	}
 
 	mlir::Value inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		if (name == "@print") {
@@ -269,10 +280,24 @@ class SCADMIRLowering {
 		}
 
 		return builder.create<mlir::scad::IndexOp>(
-			location,
-			mlir::RankedTensorType::get(1, builder.getI32Type()),
-			operands[0],
-			operands[1]
+			location, builder.getI32Type(), operands[0], operands[1]
+		);
+	}
+
+	mlir::scad::FuncOp proto_gen(FFIHIRFunctionDecl ffd) {
+		std::string name = std::string(ffd.name.data, ffd.name.size);
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, name + "PROTO", 100, 100
+		);
+
+		llvm::SmallVector<mlir::Type, 4> argTypes(
+			ffd.arg_len,
+			mlir::RankedTensorType::get(2, builder.getI32Type())
+		);
+		auto funcType = builder.getFunctionType(argTypes, std::nullopt);
+
+		return builder.create<mlir::scad::FuncOp>(
+			location, name, funcType
 		);
 	}
 
@@ -284,7 +309,7 @@ class SCADMIRLowering {
 		);
 		// Create an MLIR function for the given prototype.
 		builder.setInsertionPointToEnd(mod.getBody());
-		auto function = proto_gen(decl);
+		mlir::scad::FuncOp function = proto_gen(decl);
 
 		mlir::Block & entryBlock = function.front();
 

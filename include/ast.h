@@ -10,7 +10,7 @@ extern "C" {
 		size_t size;
 	};
 
-	struct FFIHIRArray {
+	struct FFIHIRTensor {
 		const struct FFIHIRValue * vals;
 		size_t size;
 	};
@@ -30,17 +30,19 @@ extern "C" {
 	};
 
 	union ValueUnion {
-		struct FFIHIRArray array;
+		struct FFIHIRTensor tensor;
 		struct FFIHIRInteger integer;
 		struct FFIHIRVariableReference variable_reference;
 		struct FFIHIRFunctionCall function_call;
+		uint8_t boolean;
 	};
 
 	enum FFIHirValueTag {
-		Array = 0,
+		Tensor = 0,
 		Integer = 1,
 		VariableReference = 2,
-		FunctionCall = 3
+		FunctionCall = 3,
+		Bool = 4,
 	};
 
 	struct FFIHIRValue {
@@ -54,6 +56,7 @@ extern "C" {
 		FunctionDecl = 2,
 		ForwardFunctionDecl = 3,
 		Return = 4,
+		Conditional = 5,
 	};
 
 	struct FFIHIRVariableDecl {
@@ -68,6 +71,17 @@ extern "C" {
 		const struct FFIString * arg_names;
 		size_t arg_len;
 		const struct FFIHIRExpr * e2;
+	};
+
+	struct FFIExpressionBlock {
+		struct FFIHIRValue condition;
+		struct FFIHIRExpr * block;
+	};
+
+	struct FFIHIRConditional {
+		struct FFIExpressionBlock if_arm;
+		struct FFIHIRExpr * else_arm;
+		struct FFIHIRExpr * e2;
 	};
 
 	struct FFIHIRForwardFunctionDecl {
@@ -85,6 +99,7 @@ extern "C" {
 		struct FFIHIRForwardFunctionDecl forward_func_decl;
 		uint8_t noop;
 		struct FFIHIRReturn ret;
+		struct FFIHIRConditional conditional;
 	};
 
 	struct FFIHIRExpr {
