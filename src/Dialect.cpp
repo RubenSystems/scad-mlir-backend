@@ -15,6 +15,7 @@
 #include "llvm/Support/Casting.h"
 #include <algorithm>
 #include <string>
+#include <iostream>
 
 using namespace mlir;
 using namespace mlir::scad;
@@ -74,28 +75,23 @@ mlir::LogicalResult VectorOp::verify() {
 */
 
 void ConditionalOp::build(
-	mlir::OpBuilder &builder, 
-	mlir::OperationState &state, 
+	mlir::OpBuilder & builder,
+	mlir::OperationState & state,
 	bool cond
 ) {
+	state.getOrAddProperties<Properties>().condition =
+		builder.getIntegerAttr(builder.getI1Type(), cond);
+
 	mlir::Region * if_region = state.addRegion();
-    mlir::Block * if_body = new Block();
+	mlir::Block * if_body = new Block();
 	if_region->push_back(if_body);
 
 	mlir::Region * else_region = state.addRegion();
-    mlir::Block * else_block = new Block();
+	mlir::Block * else_block = new Block();
 	else_region->push_back(else_block);
 
-	auto res_type = RankedTensorType::get({2}, builder.getI32Type());
-
-
-	state.getOrAddProperties<Properties>().condition = builder.getIntegerAttr(builder.getIntegerType(1), cond);
-
-	state.addTypes(res_type);
-
-	
+	state.addTypes(RankedTensorType::get({ 2 }, builder.getI32Type()));
 }
-
 
 /*
 ==
@@ -152,6 +148,10 @@ ReturnOp
 */
 
 mlir::LogicalResult ReturnOp::verify() {
+	return mlir::success();
+}
+
+mlir::LogicalResult YieldOp::verify() {
 	return mlir::success();
 }
 

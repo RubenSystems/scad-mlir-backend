@@ -17,8 +17,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 
-#include "ast.h"
 #include "Dialect.h"
+#include "ast.h"
 
 #include <algorithm>
 #include <cassert>
@@ -61,16 +61,16 @@ class SCADMIRLowering {
 		case Return:
 			scad_return(expression.value.ret);
 			break;
+		case Yield:
+			scad_yield(expression.value.yld);
+			break;
 		case ForwardFunctionDecl:
 			scad_func_prototype(expression.value.forward_func_decl);
-			break;
-		case Conditional: 
-			scad_conditional(expression.value.conditional);
 			break;
 		default:
 			std::cout
 				<< " " << expression.tag
-				<< "what are you trying to do to me lol \n\n\n";
+				<< "what are you trying to do to me lol expr \n\n\n";
 			break;
 		}
 	}
@@ -88,10 +88,13 @@ class SCADMIRLowering {
 			)];
 		case FunctionCall:
 			return scad_function_call(value.value.function_call);
+		case Conditional:
+			return scad_conditional(value.value.conditional);
+			break;
 		default:
 			std::cout
 				<< " " << value.tag
-				<< "what are you trying to do to me lol \n\n\n";
+				<< "what are you trying to do to me lol val \n\n\n";
 			break;
 		}
 	}
@@ -147,14 +150,13 @@ class SCADMIRLowering {
 
 	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
 		std::string name(decl.name.data, decl.name.size);
-		std::cout << name << "\n";
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, name, 100, 100);
 		// auto r = builder.create<mlir::scad::VectorOp>(
 		// 	location, scad_matrix(decl.e1.value.array)
 		// );
 		auto r = codegen(decl.e1);
-
+		std::cout << name << std::endl;
 		variables[name] = r;
 
 		codegen(*decl.e2);
@@ -192,22 +194,22 @@ class SCADMIRLowering {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("cond"), 100, 100
 		);
-		// builder.setInsertionPointToEnd(mod.getBody());
-		auto scond = builder.create<mlir::scad::ConditionalOp>(location, true);
+		// static void build(::mlir::OpBuilder &, ::mlir::OperationState &odsState, ::mlir::TypeRange resultTypes, ::mlir::ValueRange operands, ::llvm::ArrayRef<::mlir::NamedAttribute> attributes = {});
 
-		auto if_arm = &scond.getIfArm().front();
-		auto else_arm = &scond.getElseArm().front();
+		auto scond = builder.create<mlir::scad::ConditionalOp>(
+			location, true
+		);
 
+		mlir::Block & if_arm = scond.getIfArm().front();
+		mlir::Block & else_arm = scond.getElseArm().front();
 
-		builder.setInsertionPointToStart(if_arm);
-		codegen(*cond.if_arm.block);
-		builder.create<mlir::scad::ReturnOp>(location);
-		builder.setInsertionPointToStart(else_arm);
-		codegen(*cond.else_arm);
-		builder.create<mlir::scad::ReturnOp>(location);
+		builder.setInsertionPointToStart(&if_arm);
+		{ codegen(*cond.if_arm.block); }
+
+		builder.setInsertionPointToStart(&else_arm);
+		{ codegen(*cond.else_arm); }
+
 		builder.setInsertionPointAfter(scond);
-
-		codegen(*cond.e2);
 
 		return scond;
 	}
@@ -218,21 +220,17 @@ class SCADMIRLowering {
 		);
 		// Codegen the operands first.
 		SmallVector<mlir::Value, 4> operands;
-		for (size_t i = 0; i < fc.param_len; i++) {
-			auto arg = codegen(fc.params[i]);
-			if (!arg)
-				return nullptr;
-			operands.push_back(arg);
-		}
+		auto arg = codegen(fc.params[0]);
+		if (!arg)
+			return nullptr;
 
-		builder.create<mlir::scad::PrintOp>(location, operands[0]);
-		return operands[0];
+		builder.create<mlir::scad::PrintOp>(location, arg);
+		return arg;
 	}
 
 	void scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
 		codegen(*ffd.e2);
 	}
-
 
 	mlir::Value inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		if (name == "@print") {
@@ -367,7 +365,28 @@ class SCADMIRLowering {
 			ret.res.value.variable_reference.name.size
 		);
 
-		builder.create<mlir::scad::ReturnOp>(
+		auto ret_val = variables[refer];
+		auto retop = builder.create<mlir::scad::ReturnOp>(
+			location, ArrayRef(ret_val)
+		);
+
+		std::cout << retop.getOperation()->getNumResults() << "RETOP"
+			  << std::endl;
+
+		return mlir::success();
+	}
+
+	mlir::LogicalResult scad_yield(FFIHIRYield yld) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, std::string("YIELD STATEMENT!!!"), 100, 100
+		);
+
+		std::string refer = std::string(
+			yld.res.value.variable_reference.name.data,
+			yld.res.value.variable_reference.name.size
+		);
+
+		builder.create<mlir::scad::YieldOp>(
 			location, ArrayRef(variables[refer])
 		);
 		return mlir::success();
@@ -379,230 +398,240 @@ class SCADMIRLowering {
 
 
 mlir::Value generate_mlir_constant(
-	std::string name,
-	mlir::OpBuilder & builder,
-	mlir::ModuleOp & mod,
-	mlir::MLIRContext & context
+        std::string name,
+        mlir::OpBuilder & builder,
+        mlir::ModuleOp & mod,
+        mlir::MLIRContext & context
 ) {
-	mlir::Location location =
-		mlir::FileLineColLoc::get(&context, name, 100, 100);
+        mlir::Location location =
+                mlir::FileLineColLoc::get(&context, name, 100, 100);
 
-	// This is the actual attribute that holds the list of values for this
-	// tensor literal.
-	return builder.create<mlir::scad::VectorOp>(
-		location, generate_mlir_mat(builder)
-	);
+        // This is the actual attribute that holds the list of values for this
+        // tensor literal.
+        return builder.create<mlir::scad::VectorOp>(
+                location, generate_mlir_mat(builder)
+        );
 }
 
 mlir::LogicalResult generate_mlir_print(
-	mlir::OpBuilder & builder,
-	mlir::ModuleOp & mod,
-	mlir::MLIRContext & context,
-	mlir::Value arg
+        mlir::OpBuilder & builder,
+        mlir::ModuleOp & mod,
+        mlir::MLIRContext & context,
+        mlir::Value arg
 
 ) {
-	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("pritops"), 100, 100
-	);
+        mlir::Location location = mlir::FileLineColLoc::get(
+                &context, std::string("pritops"), 100, 100
+        );
 
-	builder.create<mlir::scad::PrintOp>(location, arg);
-	return mlir::success();
+        builder.create<mlir::scad::PrintOp>(location, arg);
+        return mlir::success();
 }
 
 mlir::scad::FuncOp generate_mlir_func_proto(
-	std::string name,
-	mlir::OpBuilder & builder,
-	mlir::ModuleOp & mod,
-	mlir::MLIRContext & context
+        std::string name,
+        mlir::OpBuilder & builder,
+        mlir::ModuleOp & mod,
+        mlir::MLIRContext & context
 ) {
-	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("main c"), 100, 100
-	);
+        mlir::Location location = mlir::FileLineColLoc::get(
+                &context, std::string("main c"), 100, 100
+        );
 
-	// This is a generic function, the return type will be inferred later.
-	// Arguments type are uniformly unranked tensors.
-	llvm::SmallVector<mlir::Type, 4> argTypes(
-		0, mlir::RankedTensorType::get(10, builder.getI32Type())
-	);
-	auto funcType = builder.getFunctionType(argTypes, std::nullopt);
+        // This is a generic function, the return type will be inferred later.
+        // Arguments type are uniformly unranked tensors.
+        llvm::SmallVector<mlir::Type, 4> argTypes(
+                0, mlir::RankedTensorType::get(10, builder.getI32Type())
+        );
+        auto funcType = builder.getFunctionType(argTypes, std::nullopt);
 
-	builder.setInsertionPointToEnd(mod.getBody());
-	return builder.create<mlir::scad::FuncOp>(location, name, funcType);
+        builder.setInsertionPointToEnd(mod.getBody());
+        return builder.create<mlir::scad::FuncOp>(location, name, funcType);
 }
 
 mlir::Value generate_mlir_function_call(
-	mlir::OpBuilder & builder,
-	mlir::ModuleOp & mod,
-	mlir::MLIRContext & context
+        mlir::OpBuilder & builder,
+        mlir::ModuleOp & mod,
+        mlir::MLIRContext & context
 ) {
-	llvm::StringRef callee = "do_something";
-	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("main d"), 100, 100
-	);
+        llvm::StringRef callee = "do_something";
+        mlir::Location location = mlir::FileLineColLoc::get(
+                &context, std::string("main d"), 100, 100
+        );
 
-	// Codegen the operands first.
-	SmallVector<mlir::Value, 4> operands;
-	// for (auto & expr : call.getArgs()) {
-	// 	auto arg = mlirGen(*expr);
-	// 	if (!arg)
-	// 		return nullptr;
-	// operands.push_back(
-	// 	generate_mlir_constant("v1 array", builder, mod, context)
-	// );
-	// }
+        // Codegen the operands first.
+        SmallVector<mlir::Value, 4> operands;
+        // for (auto & expr : call.getArgs()) {
+        // 	auto arg = mlirGen(*expr);
+        // 	if (!arg)
+        // 		return nullptr;
+        // operands.push_back(
+        // 	generate_mlir_constant("v1 array", builder, mod, context)
+        // );
+        // }
 
-	return builder.create<mlir::scad::GenericCallOp>(
-		location,
-		mlir::RankedTensorType::get({ 3, 2 }, builder.getI32Type()),
-		mlir::SymbolRefAttr::get(builder.getContext(), callee),
-		operands
-	);
+        return builder.create<mlir::scad::GenericCallOp>(
+                location,
+                mlir::RankedTensorType::get({ 3, 2 }, builder.getI32Type()),
+                mlir::SymbolRefAttr::get(builder.getContext(), callee),
+                operands
+        );
 }
 
 mlir::LogicalResult generate_mlir_return(
-	mlir::OpBuilder & builder,
-	mlir::ModuleOp & mod,
-	mlir::MLIRContext & context,
-	mlir::Value expr
+        mlir::OpBuilder & builder,
+        mlir::ModuleOp & mod,
+        mlir::MLIRContext & context,
+        mlir::Value expr
 ) {
-	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("do_something a"), 100, 100
-	);
+        mlir::Location location = mlir::FileLineColLoc::get(
+                &context, std::string("do_something a"), 100, 100
+        );
 
-	builder.create<mlir::scad::ReturnOp>(location, ArrayRef(expr));
-	return mlir::success();
+        builder.create<mlir::scad::ReturnOp>(location, ArrayRef(expr));
+        return mlir::success();
 }
 
 mlir::scad::FuncOp generate_mlir_func_v2(
-	mlir::OpBuilder & builder,
-	mlir::ModuleOp & mod,
-	mlir::MLIRContext & context
+        mlir::OpBuilder & builder,
+        mlir::ModuleOp & mod,
+        mlir::MLIRContext & context
 ) {
-	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("do_something b"), 100, 100
-	);
-	// Create an MLIR function for the given prototype.
-	builder.setInsertionPointToEnd(mod.getBody());
-	mlir::scad::FuncOp function = generate_mlir_func_proto(
-		std::string("do_something"), builder, mod, context
-	);
-	if (!function)
-		return nullptr;
+        mlir::Location location = mlir::FileLineColLoc::get(
+                &context, std::string("do_something b"), 100, 100
+        );
+        // Create an MLIR function for the given prototype.
+        builder.setInsertionPointToEnd(mod.getBody());
+        mlir::scad::FuncOp function = generate_mlir_func_proto(
+                std::string("do_something"), builder, mod, context
+        );
+        if (!function)
+                return nullptr;
 
-	// Let's start the body of the function now!
-	mlir::Block & entryBlock = function.front();
-	// llvm::ArrayRef<std::unique_ptr<ExprAST>> protoArgs = funcAST.getProto()->getArgs();
+        // Let's start the body of the function now!
+        mlir::Block & entryBlock = function.front();
+        // llvm::ArrayRef<std::unique_ptr<ExprAST>> protoArgs =
+funcAST.getProto()->getArgs();
 
-	// Declare all the function arguments in the symbol table.
-	// for (const auto nameValue :
-	//      llvm::zip(protoArgs, entryBlock.getArguments())) {
-	//   if (failed(declare(std::get<0>(nameValue)->getName(),
-	//                      std::get<1>(nameValue))))
-	//     return nullptr;
-	// }
+        // Declare all the function arguments in the symbol table.
+        // for (const auto nameValue :
+        //      llvm::zip(protoArgs, entryBlock.getArguments())) {
+        //   if (failed(declare(std::get<0>(nameValue)->getName(),
+        //                      std::get<1>(nameValue))))
+        //     return nullptr;
+        // }
 
-	// Set the insertion point in the builder to the beginning of the function
-	// body, it will be used throughout the codegen to create operations in this
-	// function.
-	builder.setInsertionPointToStart(&entryBlock);
+        // Set the insertion point in the builder to the beginning of the
+function
+        // body, it will be used throughout the codegen to create operations in
+this
+        // function.
+        builder.setInsertionPointToStart(&entryBlock);
 
-	// Emit the body of the function.
-	generate_mlir_constant("V2 array 1", builder, mod, context);
-	auto expression_to_ret =
-		generate_mlir_constant("V2 array2", builder, mod, context);
-	generate_mlir_return(builder, mod, context, expression_to_ret);
-	// Implicitly return void if no return statement was emitted.
-	// FIXME: we may fix the parser instead to always return the last expression
-	// (this would possibly hel∂=p the REPL case later)
-	mlir::scad::ReturnOp returnOp;
-	if (!entryBlock.empty())
-		returnOp =
-			llvm::dyn_cast<mlir::scad::ReturnOp>(entryBlock.back());
-	if (!returnOp) {
-		builder.create<mlir::scad::ReturnOp>(location);
-	} else if (returnOp.hasOperand()) {
-		// Otherwise, if this return operation has an operand then add a result to
-		// the function.
-		function.setType(builder.getFunctionType(
-			function.getFunctionType().getInputs(),
-			mlir::RankedTensorType::get(
-				{ 3, 2 }, builder.getI32Type()
-			)
-		));
-	}
+        // Emit the body of the function.
+        generate_mlir_constant("V2 array 1", builder, mod, context);
+        auto expression_to_ret =
+                generate_mlir_constant("V2 array2", builder, mod, context);
+        generate_mlir_return(builder, mod, context, expression_to_ret);
+        // Implicitly return void if no return statement was emitted.
+        // FIXME: we may fix the parser instead to always return the last
+expression
+        // (this would possibly hel∂=p the REPL case later)
+        mlir::scad::ReturnOp returnOp;
+        if (!entryBlock.empty())
+                returnOp =
+                        llvm::dyn_cast<mlir::scad::ReturnOp>(entryBlock.back());
+        if (!returnOp) {
+                builder.create<mlir::scad::ReturnOp>(location);
+        } else if (returnOp.hasOperand()) {
+                // Otherwise, if this return operation has an operand then add a
+result to
+                // the function.
+                function.setType(builder.getFunctionType(
+                        function.getFunctionType().getInputs(),
+                        mlir::RankedTensorType::get(
+                                { 3, 2 }, builder.getI32Type()
+                        )
+                ));
+        }
 
-	// If this function isn't main, then set the visibility to private.
-	// if (funcAST.getProto()->getName() != "main")
-	// 	function.setPrivate();
+        // If this function isn't main, then set the visibility to private.
+        // if (funcAST.getProto()->getName() != "main")
+        // 	function.setPrivate();
 
-	return function;
+        return function;
 }
 
 mlir::scad::FuncOp generate_mlir_func(
-	mlir::OpBuilder & builder,
-	mlir::ModuleOp & mod,
-	mlir::MLIRContext & context
+        mlir::OpBuilder & builder,
+        mlir::ModuleOp & mod,
+        mlir::MLIRContext & context
 ) {
-	mlir::Location location = mlir::FileLineColLoc::get(
-		&context, std::string("main a"), 100, 100
-	);
-	// Create an MLIR function for the given prototype.
-	builder.setInsertionPointToEnd(mod.getBody());
-	mlir::scad::FuncOp function = generate_mlir_func_proto(
-		std::string("main"), builder, mod, context
-	);
-	if (!function)
-		return nullptr;
+        mlir::Location location = mlir::FileLineColLoc::get(
+                &context, std::string("main a"), 100, 100
+        );
+        // Create an MLIR function for the given prototype.
+        builder.setInsertionPointToEnd(mod.getBody());
+        mlir::scad::FuncOp function = generate_mlir_func_proto(
+                std::string("main"), builder, mod, context
+        );
+        if (!function)
+                return nullptr;
 
-	// Let's start the body of the function now!
-	mlir::Block & entryBlock = function.front();
-	// llvm::ArrayRef<std::unique_ptr<ExprAST>> protoArgs = funcAST.getProto()->getArgs();
+        // Let's start the body of the function now!
+        mlir::Block & entryBlock = function.front();
+        // llvm::ArrayRef<std::unique_ptr<ExprAST>> protoArgs =
+funcAST.getProto()->getArgs();
 
-	// Declare all the function arguments in the symbol table.
-	// for (const auto nameValue :
-	//      llvm::zip(protoArgs, entryBlock.getArguments())) {
-	//   if (failed(declare(std::get<0>(nameValue)->getName(),
-	//                      std::get<1>(nameValue))))
-	//     return nullptr;
-	// }
+        // Declare all the function arguments in the symbol table.
+        // for (const auto nameValue :
+        //      llvm::zip(protoArgs, entryBlock.getArguments())) {
+        //   if (failed(declare(std::get<0>(nameValue)->getName(),
+        //                      std::get<1>(nameValue))))
+        //     return nullptr;
+        // }
 
-	// Set the insertion point in the builder to the beginning of the function
-	// body, it will be used throughout the codegen to create operations in this
-	// function.
-	builder.setInsertionPointToStart(&entryBlock);
+        // Set the insertion point in the builder to the beginning of the
+function
+        // body, it will be used throughout the codegen to create operations in
+this
+        // function.
+        builder.setInsertionPointToStart(&entryBlock);
 
-	// Emit the body of the function.
-	generate_mlir_constant("v1 array", builder, mod, context);
-	generate_mlir_print(
-		builder,
-		mod,
-		context,
-		generate_mlir_constant("v1 array1", builder, mod, context)
-	);
-	generate_mlir_function_call(builder, mod, context);
-	// Implicitly return void if no return statement was emitted.
-	// FIXME: we may fix the parser instead to always return the last expression
-	// (this would possibly help the REPL case later)
-	mlir::scad::ReturnOp returnOp;
-	if (!entryBlock.empty())
-		returnOp =
-			llvm::dyn_cast<mlir::scad::ReturnOp>(entryBlock.back());
-	if (!returnOp) {
-		builder.create<mlir::scad::ReturnOp>(location);
-	} else if (returnOp.hasOperand()) {
-		// Otherwise, if this return operation has an operand then add a result to
-		// the function.
-		function.setType(builder.getFunctionType(
-			function.getFunctionType().getInputs(),
-			mlir::RankedTensorType::get(10, builder.getI32Type())
-		));
-	}
+        // Emit the body of the function.
+        generate_mlir_constant("v1 array", builder, mod, context);
+        generate_mlir_print(
+                builder,
+                mod,
+                context,
+                generate_mlir_constant("v1 array1", builder, mod, context)
+        );
+        generate_mlir_function_call(builder, mod, context);
+        // Implicitly return void if no return statement was emitted.
+        // FIXME: we may fix the parser instead to always return the last
+expression
+        // (this would possibly help the REPL case later)
+        mlir::scad::ReturnOp returnOp;
+        if (!entryBlock.empty())
+                returnOp =
+                        llvm::dyn_cast<mlir::scad::ReturnOp>(entryBlock.back());
+        if (!returnOp) {
+                builder.create<mlir::scad::ReturnOp>(location);
+        } else if (returnOp.hasOperand()) {
+                // Otherwise, if this return operation has an operand then add a
+result to
+                // the function.
+                function.setType(builder.getFunctionType(
+                        function.getFunctionType().getInputs(),
+                        mlir::RankedTensorType::get(10, builder.getI32Type())
+                ));
+        }
 
-	// If this function isn't main, then set the visibility to private.
-	// if (funcAST.getProto()->getName() != "main")
-	// 	function.setPrivate();
+        // If this function isn't main, then set the visibility to private.
+        // if (funcAST.getProto()->getName() != "main")
+        // 	function.setPrivate();
 
-	return function;
+        return function;
 }
 */
 

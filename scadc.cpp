@@ -67,7 +67,9 @@ int main() {
 		return -1;
 	}
 
+	std::cout << "HIERE!!!" << std::endl;
 	owned_mod->dump();
+	std::cout << "HIERE!!!" << std::endl;
 
 	{
 		mlir::OpPassManager & optPM = pm.nest<mlir::scad::FuncOp>();

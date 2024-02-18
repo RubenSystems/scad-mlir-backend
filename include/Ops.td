@@ -75,29 +75,25 @@ def FuncOp : Scad_Op<"fn", [
 
 /*
 =============
-Conditional op 
+Conditional op
 =============
-*/ 
-def ConditionalOp : Scad_Op<"cond", [Pure]> {
+*/
+def ConditionalOp : Scad_Op<"cond"> {
   let summary = "if this then that else that";
 
 
-  let arguments = (ins
-    I1Attr:$condition
-  );
+  let arguments = (ins I1Attr:$condition);
   let results = (outs I32Tensor);
-  let regions = (region 
-    AnyRegion:$if_arm, 
+  let regions = (region
+    AnyRegion:$if_arm,
     AnyRegion:$else_arm
   );
 
+  // let hasCustomAssemblyFormat = 1;
+
   let builders = [
-    // OpBuilder<(ins "DenseIntElementsAttr":$condition), [{build($_builder, $_state, condition.getType(), condition;}]>,
     OpBuilder<(ins "bool":$condition)>
   ];
-
-  // let skipDefaultBuilders = 1;
-
 }
 
 
@@ -121,8 +117,28 @@ def ReturnOp : Scad_Op<"return", [Pure, HasParent<"FuncOp">,
   let hasVerifier = 1;
 }
 
+def YieldOp : Scad_Op<"yield", [Pure, HasParent<"ConditionalOp">,
+                                 Terminator]> {
+  let summary = "yield operation to provide a value for a conditional";
+
+
+  let arguments = (ins Variadic<I32Tensor>:$input);
+
+  let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
+
+  let builders = [
+    OpBuilder<(ins), [{ build($_builder, $_state, std::nullopt); }]>
+  ];
+
+  let extraClassDeclaration = [{
+    bool hasOperand() { return getNumOperands() != 0; }
+  }];
+
+  let hasVerifier = 1;
+}
+
 def GenericCallOp : Scad_Op<"generic_call",
-    [Pure, DeclareOpInterfaceMethods<CallOpInterface>]> {
+    [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "generic call operation";
 
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32Tensor>:$inputs);
