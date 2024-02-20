@@ -194,11 +194,18 @@ class SCADMIRLowering {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("cond"), 100, 100
 		);
-		// static void build(::mlir::OpBuilder &, ::mlir::OperationState &odsState, ::mlir::TypeRange resultTypes, ::mlir::ValueRange operands, ::llvm::ArrayRef<::mlir::NamedAttribute> attributes = {});
 
-		auto scond = builder.create<mlir::scad::ConditionalOp>(
-			location, true
+		auto bl = builder.create<mlir::scad::BoolOp>(
+			location,
+			mlir::IntegerType::get(
+				builder.getContext(),
+				1,
+				mlir::IntegerType::SignednessSemantics::Signless
+			),
+			true
 		);
+		auto scond =
+			builder.create<mlir::scad::ConditionalOp>(location, bl);
 
 		mlir::Block & if_arm = scond.getIfArm().front();
 		mlir::Block & else_arm = scond.getElseArm().front();

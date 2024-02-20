@@ -32,9 +32,16 @@ def VectorOp : Scad_Op<"vector", [Pure]> {
 
     OpBuilder<(ins "int32_t":$value)>
   ];
-
 }
 
+// DUMMY
+def BoolOp : Scad_Op<"bool", [Pure]> {
+
+
+  let arguments = (ins I1Attr:$value);
+  let results = (outs I1);
+
+}
 
 def FuncOp : Scad_Op<"fn", [
     FunctionOpInterface, IsolatedFromAbove
@@ -82,7 +89,7 @@ def ConditionalOp : Scad_Op<"cond"> {
   let summary = "if this then that else that";
 
 
-  let arguments = (ins I1Attr:$condition);
+  let arguments = (ins I1:$condition);
   let results = (outs I32Tensor);
   let regions = (region
     AnyRegion:$if_arm,
@@ -92,7 +99,7 @@ def ConditionalOp : Scad_Op<"cond"> {
   // let hasCustomAssemblyFormat = 1;
 
   let builders = [
-    OpBuilder<(ins "bool":$condition)>
+    OpBuilder<(ins "Value":$condition)>
   ];
 }
 

@@ -12,6 +12,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/TypeID.h"
+#include "mlir/IR/IntegerSet.h"
 #include "passes.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -294,6 +295,56 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 	}
 };
 
+struct ConditionalOpLowering : public OpConversionPattern<scad::ConditionalOp> {
+	using OpConversionPattern<scad::ConditionalOp>::OpConversionPattern;
+
+	LogicalResult matchAndRewrite(
+		scad::ConditionalOp op,
+		mlir::scad::ConditionalOpAdaptor adaptor,
+		ConversionPatternRewriter & rewriter
+	) const final {
+		auto conditional_set = mlir::IntegerSet::get(
+			1, 0, rewriter.getAffineDimExpr(0) - 10, { false }
+
+		);
+
+		mlir::Type type = mlir::IntegerType::get(
+			rewriter.getContext(),
+			32,
+			mlir::IntegerType::SignednessSemantics::Signless
+		);
+
+		mlir::Value constant =
+			rewriter.create<mlir::arith::ConstantIndexOp>(
+				rewriter.getUnknownLoc(), 100
+			);
+
+		auto cond = rewriter.replaceOpWithNewOp<affine::AffineIfOp>(
+			op,
+			MemRefType::get({ 2 }, rewriter.getI32Type()),
+			conditional_set,
+			constant,
+			true
+		);
+
+		rewriter.inlineBlockBefore(
+			&adaptor.getIfArm().front(),
+			&cond.getThenRegion().front(),
+			cond.getThenRegion().back().end()
+		);
+
+		rewriter.inlineBlockBefore(
+			&adaptor.getElseArm().front(),
+			&cond.getElseRegion().front(),
+			cond.getElseRegion().back().end()
+		);
+
+		// auto block = cond.getThenRegion().front();
+
+		return success();
+	}
+};
+
 struct PrintOpLowering : public OpConversionPattern<scad::PrintOp> {
 	using OpConversionPattern<scad::PrintOp>::OpConversionPattern;
 
@@ -318,6 +369,22 @@ struct ReturnOpLowering : public OpConversionPattern<scad::ReturnOp> {
 		ConversionPatternRewriter & rewriter
 	) const final {
 		rewriter.replaceOpWithNewOp<func::ReturnOp>(
+			op, adaptor.getOperands()
+		);
+
+		return success();
+	}
+};
+
+struct YieldOpLowering : public OpConversionPattern<scad::YieldOp> {
+	using OpConversionPattern<scad::YieldOp>::OpConversionPattern;
+
+	LogicalResult matchAndRewrite(
+		scad::YieldOp op,
+		OpAdaptor adaptor,
+		ConversionPatternRewriter & rewriter
+	) const final {
+		rewriter.replaceOpWithNewOp<affine::AffineYieldOp>(
 			op, adaptor.getOperands()
 		);
 
@@ -436,7 +503,9 @@ void SCADToAffineLoweringPass::runOnOperation() {
 		     CallOpLowering,
 		     AddOpLowering,
 		     IndexOpLowering,
-		     PrintOpLowering>(&getContext());
+		     PrintOpLowering,
+		     ConditionalOpLowering,
+		     YieldOpLowering>(&getContext());
 
 	if (failed(applyPartialConversion(
 		    getOperation(), target, std::move(patterns)

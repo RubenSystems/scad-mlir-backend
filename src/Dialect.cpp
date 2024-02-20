@@ -77,11 +77,9 @@ mlir::LogicalResult VectorOp::verify() {
 void ConditionalOp::build(
 	mlir::OpBuilder & builder,
 	mlir::OperationState & state,
-	bool cond
+	mlir::Value cond
 ) {
-	state.getOrAddProperties<Properties>().condition =
-		builder.getIntegerAttr(builder.getI1Type(), cond);
-
+	state.addOperands(cond);
 	mlir::Region * if_region = state.addRegion();
 	mlir::Block * if_body = new Block();
 	if_region->push_back(if_body);
