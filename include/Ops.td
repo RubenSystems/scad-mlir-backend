@@ -186,16 +186,16 @@ def AddOp : Scad_Op<"add",
   ];
 }
 
-def DropOp : Scad_Op<"drop"> {
-  let summary = "deallocate";
-  let assemblyFormat = "$value attr-dict `:` type($value)";
+// def DropOp : Scad_Op<"drop"> {
+//   let summary = "deallocate";
+//   let assemblyFormat = "$value attr-dict `:` type($value)";
 
-  let arguments = (ins I32Tensor:$value);
+//   let arguments = (ins I32MemRef:$value);
 
-  // let builders = [
-  //   OpBuilder<(ins "Value":$dropval)>
-  // ];
-}
+//   // let builders = [
+//   //   OpBuilder<(ins "Value":$dropval)>
+//   // ];
+// }
 
 def IndexOp : Scad_Op<"index",
     [Pure]> {

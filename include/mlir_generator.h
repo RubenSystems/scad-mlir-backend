@@ -59,6 +59,11 @@ using llvm::SmallVector;
 using llvm::StringRef;
 using llvm::Twine;
 
+struct Alloc {
+	mlir::Value val;
+	bool freed; 
+};
+
 class SCADMIRLowering {
     public:
 	SCADMIRLowering(
@@ -132,7 +137,7 @@ class SCADMIRLowering {
 	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
 	std::unordered_map<std::string, mlir::Value> variables;
 
-	std::unordered_map<std::string, mlir::Value> allocations;
+	std::unordered_map<std::string, Alloc> allocations;
 
     private:
 	mlir::LogicalResult declare(std::string var, mlir::Value value) {
@@ -221,6 +226,14 @@ class SCADMIRLowering {
 		// 	location, scad_matrix(decl.e1.value.array)
 		// );
 		auto r = codegen(decl.e1);
+
+		if (decl.e1.tag == Tensor) {
+			Alloc alloc_flag;
+			alloc_flag.freed = false; 
+			alloc_flag.val = r;
+			allocations[name] = alloc_flag;
+		}
+
 		std::cout << name << std::endl;
 		variables[name] = r;
 
@@ -302,11 +315,20 @@ class SCADMIRLowering {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("dropop"), 100, 100
 		);
-		auto arg = codegen(fc.params[0]);
-		if (!arg)
-			return mlir::failure();
+		// Currently drop assumes a variable reference. 
+		// auto arg = codegen(fc.params[0]);
 
-		builder.create<mlir::scad::DropOp>(location, arg);
+		std::string vrname  (fc.params[0].value.variable_reference.name.data, fc.params[0].value.variable_reference.name.size);
+		if (allocations.find(vrname) != allocations.end()){
+			Alloc & alloced = allocations[vrname];
+			if (!alloced.freed){
+				// builder.create<mlir::scad::DropOp>(location, alloced.val);
+				auto dealloc = builder.create<mlir::memref::DeallocOp>(location, alloced.val);
+				alloced.freed = true;
+			}
+		}
+
+		
 		return mlir::success();
 	}
 
