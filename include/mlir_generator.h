@@ -222,18 +222,28 @@ class SCADMIRLowering {
 		return scond;
 	}
 
-	mlir::Value scad_print(FFIHIRFunctionCall fc) {
+	mlir::LogicalResult scad_print(FFIHIRFunctionCall fc) {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("pritops"), 100, 100
 		);
-		// Codegen the operands first.
-		SmallVector<mlir::Value, 4> operands;
 		auto arg = codegen(fc.params[0]);
 		if (!arg)
-			return nullptr;
+			return mlir::failure();
 
 		builder.create<mlir::scad::PrintOp>(location, arg);
-		return arg;
+		return mlir::success();
+	}
+
+	mlir::LogicalResult scad_drop(FFIHIRFunctionCall fc) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, std::string("dropop"), 100, 100
+		);
+		auto arg = codegen(fc.params[0]);
+		if (!arg)
+			return mlir::failure();
+
+		builder.create<mlir::scad::DropOp>(location, arg);
+		return mlir::success();
 	}
 
 	void scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
@@ -242,11 +252,15 @@ class SCADMIRLowering {
 
 	mlir::Value inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		if (name == "@print") {
-			return scad_print(fc);
+			scad_print(fc);
+			return nullptr;
 		} else if (name == "@add") {
 			return scad_add(fc);
 		} else if (name == "@index") {
 			return scad_index(fc);
+		} else if (name == "@drop") {
+			scad_drop(fc);
+			return nullptr;
 		}
 	}
 

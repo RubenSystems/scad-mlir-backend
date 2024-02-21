@@ -211,6 +211,15 @@ void AddOp::build(
 	state.addOperands({ lhs, rhs });
 }
 
+// void DropOp::build(
+// 	mlir::OpBuilder & builder,
+// 	mlir::OperationState & state,
+// 	mlir::Value value
+// ) {
+// 	state.addOperands({ value });
+// }
+
+
 /*
 ===
 Index Operation

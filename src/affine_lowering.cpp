@@ -54,8 +54,8 @@ static Value insert_alloc_and_dealloc(
 
 	// Make sure to deallocate this alloc at the end of the block. This is fine
 	// as toy functions have no control flow.
-	// auto dealloc = rewriter.create<memref::DeallocOp>(loc, alloc);
-	// dealloc->moveBefore(&parentBlock->back());
+	auto dealloc = rewriter.create<memref::DeallocOp>(loc, alloc);
+	dealloc->moveBefore(&parentBlock->back());
 	return alloc;
 }
 
@@ -456,18 +456,6 @@ struct IndexOpLowering : public OpConversionPattern<scad::IndexOp> {
 			adaptor.getValue(),
 			llvm::ArrayRef(constant_indicies)
 		);
-
-		// auto alloc =
-		// 	insert_alloc_and_dealloc(MemRefType::get({2}, op.getValue().getType().getElementType()), op.getLoc(), rewriter);
-
-		// rewriter.create<affine::AffineStoreOp>(
-		// 	op.getLoc(),
-		// 	adaptor.getValue(),
-		// 	alloc,
-		// 	llvm::ArrayRef(constant_indicies)
-		// );
-
-		// rewriter.replaceOp(op, alloc);
 
 		return success();
 	}

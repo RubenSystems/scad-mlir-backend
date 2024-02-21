@@ -1,24 +1,13 @@
-    fn main() 2xi32;
+fn main() 2xi32;
 
-	fn super_add(a: 2xi32) 2xi32 {
-		@add(a: @{1000, 1000}, b: a)
-	};
+fn add_200(a: 2xi32, b: 2xi32) 2xi32 {
+	@add(a: a, b: @add(a: b, b: @{200, 200}))
+};
 
-    fn main() 2xi32 {
-        let mut x: 2xi32 = @{700, 800};
+fn main() 2xi32 {
+	let mut x: 2xi32 = @{700, 800};
 
+	@print(value: x);
 
-        let mut super_x: 2xi32 = super_add(a: x);
-
-        @print(val: super_x);
-
-        let mut does_it_work: 2xi32 = if true {
-            super_x
-        } else {
-            x
-        };
-
-        @print(value: does_it_work);
-
-        does_it_work
-    };
+	x
+};
