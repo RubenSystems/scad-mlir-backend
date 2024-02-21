@@ -163,9 +163,6 @@ struct BinaryOpLowering : public ConversionPattern {
 };
 using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddIOp>;
 
-
-
-
 struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 	using OpRewritePattern<scad::VectorOp>::OpRewritePattern;
 
@@ -297,20 +294,30 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 		// rewriter.eraseOp(op);
 
 		if (op.getName() == "main") {
-			auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getName(), op.getFunctionType());
-			rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+			auto func = rewriter.create<mlir::func::FuncOp>(
+				op.getLoc(), op.getName(), op.getFunctionType()
+			);
+			rewriter.inlineRegionBefore(
+				op.getRegion(), func.getBody(), func.end()
+			);
 
 		} else {
 			// Assumes funcitons have more then one restype
-			auto res_type = adaptor.getFunctionType().getResults()[0];
-			auto result_type = llvm::cast<RankedTensorType>(res_type);
+			auto res_type =
+				adaptor.getFunctionType().getResults()[0];
+			auto result_type =
+				llvm::cast<RankedTensorType>(res_type);
 
 			SmallVector<mlir::Type, 4> lowered_operands;
-			for (auto & input_type : op.getFunctionType().getInputs()) {
+			for (auto & input_type :
+			     op.getFunctionType().getInputs()) {
 				auto param_type =
-					llvm::cast<RankedTensorType>(input_type);
+					llvm::cast<RankedTensorType>(input_type
+					);
 				lowered_operands.push_back(
-					convert_tensor_type_to_memref_type(param_type)
+					convert_tensor_type_to_memref_type(
+						param_type
+					)
 				);
 			}
 
@@ -329,8 +336,9 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 				auto arg_type = function_type.getInput(i);
 				entry_block.getArgument(i).setType(arg_type);
 			}
-			rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
-
+			rewriter.inlineRegionBefore(
+				op.getRegion(), func.getBody(), func.end()
+			);
 		}
 		rewriter.eraseOp(op);
 		return success();

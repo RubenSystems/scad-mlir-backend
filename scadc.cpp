@@ -37,12 +37,10 @@ extern "C" {
 	FFIHIRExpr compile(const char *);
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char * argv[]) {
 	mlir::registerAsmPrinterCLOptions();
 	mlir::registerMLIRContextCLOptions();
 	mlir::registerPassManagerCLOptions();
-
-
 
 	FFIHIRExpr x = compile(argv[1]);
 
@@ -54,6 +52,9 @@ int main(int argc, const char* argv[]) {
 	mlir::ModuleOp mod = mlir::ModuleOp::create(builder.getUnknownLoc());
 	mlir::OwningOpRef<mlir::ModuleOp> owned_mod = mod;
 	context.getOrLoadDialect<mlir::scad::SCADDialect>();
+	context.getOrLoadDialect<mlir::arith::ArithDialect>();
+	context.getOrLoadDialect<mlir::memref::MemRefDialect>();
+	context.getOrLoadDialect<mlir::affine::AffineDialect>();
 
 	SCADMIRLowering scad_lowerer(context, builder, mod);
 
@@ -117,7 +118,6 @@ int main(int argc, const char* argv[]) {
 		llvm::errs() << "Failed to convert to llvm engine\n";
 		return -1;
 	}
-
 
 	// auto tmBuilderOrError =
 	// 	llvm::orc::JITTargetMachineBuilder::detectHost();

@@ -20,6 +20,30 @@
 #include "Dialect.h"
 #include "ast.h"
 
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinDialect.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/TypeID.h"
+#include "mlir/IR/IntegerSet.h"
+
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Sequence.h"
+#include "llvm/Support/Casting.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -79,8 +103,8 @@ class SCADMIRLowering {
 		switch (value.tag) {
 		case Tensor:
 			return scad_vector(value.value.tensor);
-		// case Integer:
-		// 	break;
+		case Integer:
+			return scad_integer(value.value.integer);
 		case VariableReference:
 			return variables[std::string(
 				value.value.variable_reference.name.data,
@@ -108,6 +132,8 @@ class SCADMIRLowering {
 	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
 	std::unordered_map<std::string, mlir::Value> variables;
 
+	std::unordered_map<std::string, mlir::Value> allocations;
+
     private:
 	mlir::LogicalResult declare(std::string var, mlir::Value value) {
 		if (variables.find(var) != variables.end()) {
@@ -117,23 +143,39 @@ class SCADMIRLowering {
 		return mlir::success();
 	}
 
-	mlir::DenseIntElementsAttr scad_matrix(FFIHIRTensor arr) {
-		std::vector<uint32_t> data;
+	mlir::MemRefType
+	create_memref_type(mlir::ArrayRef<int64_t> shape, mlir::Type type) {
+		return mlir::MemRefType::get(shape, type);
+	}
 
-		for (size_t i = 0; i < arr.size; i++) {
-			data.push_back((uint32_t)arr.vals[i].value.integer.value
-			);
-		}
+	// mlir::DenseIntElementsAttr scad_matrix(FFIHIRTensor arr) {
+	// 	std::vector<uint32_t> data;
 
-		// The type of this attribute is tensor of 64-bit floating-point with the
-		// shape of the literal.
-		mlir::Type elementType = builder.getI32Type();
-		auto dataType = mlir::RankedTensorType::get(
-			{ (long long)arr.size }, elementType
+	// 	for (size_t i = 0; i < arr.size; i++) {
+	// 		data.push_back((uint32_t)arr.vals[i].value.integer.value
+	// 		);
+	// 	}
+
+	// 	// The type of this attribute is tensor of 64-bit floating-point with the
+	// 	// shape of the literal.
+	// 	mlir::Type elementType = builder.getI32Type();
+	// 	auto dataType = mlir::RankedTensorType::get(
+	// 		{ (long long)arr.size }, elementType
+	// 	);
+	// 	return mlir::DenseIntElementsAttr::get(
+	// 		dataType, llvm::ArrayRef(data)
+	// 	);
+	// }
+
+	mlir::Value scad_integer(FFIHIRInteger i) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, "Integer literal", 100, 100
 		);
-		return mlir::DenseIntElementsAttr::get(
-			dataType, llvm::ArrayRef(data)
+
+		auto attr = mlir::IntegerAttr::get(
+			builder.getI32Type(), mlir::APInt(32, i.value)
 		);
+		return builder.create<mlir::arith::ConstantOp>(location, attr);
 	}
 
 	mlir::Value scad_vector(FFIHIRTensor arr) {
@@ -144,9 +186,31 @@ class SCADMIRLowering {
 			100
 		);
 
-		return builder.create<mlir::scad::VectorOp>(
-			location, scad_matrix(arr)
+		auto alloc = builder.create<mlir::memref::AllocOp>(
+			location,
+			create_memref_type(arr.size, builder.getI32Type())
 		);
+		auto * parentBlock = alloc->getBlock();
+
+		for (int i = 0; i < arr.size; i++) {
+			SmallVector<mlir::Value, 2> indices;
+			auto value_at_index = codegen(arr.vals[i]);
+			indices.push_back(
+				builder.create<mlir::arith::ConstantIndexOp>(
+					location, i
+				)
+			);
+			builder.create<mlir::affine::AffineStoreOp>(
+				location,
+				value_at_index,
+				alloc,
+				llvm::ArrayRef(indices)
+			);
+		}
+
+		// alloc->moveBefore(&parentBlock->front());
+
+		return alloc;
 	}
 
 	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
@@ -401,7 +465,6 @@ class SCADMIRLowering {
 				location, ArrayRef(ret_val)
 			);
 		}
-		
 
 		return mlir::success();
 	}
