@@ -103,6 +103,7 @@ class SCADMIRLowering {
 	mlir::MLIRContext & context;
 	mlir::OpBuilder & builder;
 	mlir::ModuleOp & mod;
+	bool is_generating_main = false;
 
 	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
 	std::unordered_map<std::string, mlir::Value> variables;
@@ -333,7 +334,10 @@ class SCADMIRLowering {
 		builder.setInsertionPointToStart(&entryBlock);
 
 		// Emit the body of the function.
+		if (name == "main")
+			is_generating_main = true;
 		codegen(*decl.block);
+		is_generating_main = false;
 		builder.setInsertionPointToEnd(mod.getBody());
 
 		mlir::scad::ReturnOp returnOp;
@@ -343,7 +347,7 @@ class SCADMIRLowering {
 			);
 		if (!returnOp) {
 			builder.create<mlir::scad::ReturnOp>(location);
-		} else if (returnOp.hasOperand()) {
+		} else if (returnOp.hasOperand() && name != "main") {
 			// Otherwise, if this return operation has an operand then add a result to
 			// the function.
 			function.setType(builder.getFunctionType(
@@ -373,12 +377,17 @@ class SCADMIRLowering {
 		);
 
 		auto ret_val = variables[refer];
-		auto retop = builder.create<mlir::scad::ReturnOp>(
-			location, ArrayRef(ret_val)
-		);
 
-		std::cout << retop.getOperation()->getNumResults() << "RETOP"
-			  << std::endl;
+		if (is_generating_main) {
+			auto retop = builder.create<mlir::scad::ReturnOp>(
+				location /*, ArrayRef(ret_val)*/
+			);
+		} else {
+			auto retop = builder.create<mlir::scad::ReturnOp>(
+				location, ArrayRef(ret_val)
+			);
+		}
+		
 
 		return mlir::success();
 	}

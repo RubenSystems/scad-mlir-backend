@@ -54,8 +54,8 @@ static Value insert_alloc_and_dealloc(
 
 	// Make sure to deallocate this alloc at the end of the block. This is fine
 	// as toy functions have no control flow.
-	auto dealloc = rewriter.create<memref::DeallocOp>(loc, alloc);
-	dealloc->moveBefore(&parentBlock->back());
+	// auto dealloc = rewriter.create<memref::DeallocOp>(loc, alloc);
+	// dealloc->moveBefore(&parentBlock->back());
 	return alloc;
 }
 
@@ -163,6 +163,9 @@ struct BinaryOpLowering : public ConversionPattern {
 };
 using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddIOp>;
 
+
+
+
 struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
 	using OpRewritePattern<scad::VectorOp>::OpRewritePattern;
 
@@ -256,40 +259,79 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 		mlir::scad::FuncOpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-		auto res_type = adaptor.getFunctionType().getResults(
-		)[0]; // watch out it dosnt work for meore then one restype
-		auto result_type = llvm::cast<RankedTensorType>(res_type);
+		// auto res_type = adaptor.getFunctionType().getResults(
+		// )[0]; // watch out it dosnt work for meore then one restype
+		// auto result_type = llvm::cast<RankedTensorType>(res_type);
 
-		SmallVector<mlir::Type, 4> lowered_operands;
-		for (auto & input_type : op.getFunctionType().getInputs()) {
-			auto param_type =
-				llvm::cast<RankedTensorType>(input_type);
-			lowered_operands.push_back(
-				convert_tensor_type_to_memref_type(param_type)
+		// SmallVector<mlir::Type, 4> lowered_operands;
+		// for (auto & input_type : op.getFunctionType().getInputs()) {
+		// 	auto param_type =
+		// 		llvm::cast<RankedTensorType>(input_type);
+		// 	lowered_operands.push_back(
+		// 		convert_tensor_type_to_memref_type(param_type)
+		// 	);
+		// }
+
+		// auto function_type = rewriter.getFunctionType(
+		// 	lowered_operands,
+		// 	adaptor.getFunctionType()
+		// 	// convert_tensor_type_to_memref_type(result_type)
+		// );
+
+		// auto func = rewriter.create<mlir::func::FuncOp>(
+		// 	op.getLoc(), op.getName(), function_type
+		// );
+
+		// mlir::Block & entry_block = op.front();
+		// // mlir::Block & new_entry_block = func.front();
+
+		// auto entry_args = entry_block.getArguments();
+		// for (size_t i = 0; i < entry_args.size(); i++) {
+		// 	auto arg_type = function_type.getInput(i);
+		// 	entry_block.getArgument(i).setType(arg_type);
+		// }
+
+		// rewriter.inlineRegionBefore(
+		// 	op.getRegion(), func.getBody(), func.end()
+		// );
+		// rewriter.eraseOp(op);
+
+		if (op.getName() == "main") {
+			auto func = rewriter.create<mlir::func::FuncOp>(op.getLoc(), op.getName(), op.getFunctionType());
+			rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+
+		} else {
+			// Assumes funcitons have more then one restype
+			auto res_type = adaptor.getFunctionType().getResults()[0];
+			auto result_type = llvm::cast<RankedTensorType>(res_type);
+
+			SmallVector<mlir::Type, 4> lowered_operands;
+			for (auto & input_type : op.getFunctionType().getInputs()) {
+				auto param_type =
+					llvm::cast<RankedTensorType>(input_type);
+				lowered_operands.push_back(
+					convert_tensor_type_to_memref_type(param_type)
+				);
+			}
+
+			auto function_type = rewriter.getFunctionType(
+				lowered_operands,
+				convert_tensor_type_to_memref_type(result_type)
 			);
+
+			auto func = rewriter.create<mlir::func::FuncOp>(
+				op.getLoc(), op.getName(), function_type
+			);
+
+			mlir::Block & entry_block = op.front();
+			auto entry_args = entry_block.getArguments();
+			for (size_t i = 0; i < entry_args.size(); i++) {
+				auto arg_type = function_type.getInput(i);
+				entry_block.getArgument(i).setType(arg_type);
+			}
+			rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
+
 		}
-
-		auto function_type = rewriter.getFunctionType(
-			lowered_operands,
-			convert_tensor_type_to_memref_type(result_type)
-		);
-
-		auto func = rewriter.create<mlir::func::FuncOp>(
-			op.getLoc(), op.getName(), function_type
-		);
-
-		mlir::Block & entry_block = op.front();
-		// mlir::Block & new_entry_block = func.front();
-
-		auto entry_args = entry_block.getArguments();
-		for (size_t i = 0; i < entry_args.size(); i++) {
-			auto arg_type = function_type.getInput(i);
-			entry_block.getArgument(i).setType(arg_type);
-		}
-
-		rewriter.inlineRegionBefore(
-			op.getRegion(), func.getBody(), func.end()
-		);
 		rewriter.eraseOp(op);
 		return success();
 	}

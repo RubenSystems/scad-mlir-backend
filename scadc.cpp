@@ -34,15 +34,17 @@
 #include "llvm/Support/raw_ostream.h"
 
 extern "C" {
-	FFIHIRExpr compile();
+	FFIHIRExpr compile(const char *);
 }
 
-int main() {
+int main(int argc, const char* argv[]) {
 	mlir::registerAsmPrinterCLOptions();
 	mlir::registerMLIRContextCLOptions();
 	mlir::registerPassManagerCLOptions();
 
-	FFIHIRExpr x = compile();
+
+
+	FFIHIRExpr x = compile(argv[1]);
 
 	mlir::DialectRegistry registry;
 	mlir::func::registerAllExtensions(registry);
@@ -94,12 +96,17 @@ int main() {
 	std::cout << "\n\n\n";
 	owned_mod->dump();
 	std::cout << "\n\n\n";
+
 	pm.addPass(mlir::scad::createLowerToLLVMPass());
+	pm.addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
 	if (mlir::failed(pm.run(*owned_mod))) {
 		std::cout << "failed to run passes\n";
 		return -1;
 	}
 	owned_mod->dump();
+
+	llvm::InitializeNativeTarget();
+	llvm::InitializeNativeTargetAsmPrinter();
 
 	mlir::registerBuiltinDialectTranslation(*mod->getContext());
 	mlir::registerLLVMDialectTranslation(*mod->getContext());
@@ -107,28 +114,26 @@ int main() {
 	llvm::LLVMContext llvmContext;
 	auto llvmModule = mlir::translateModuleToLLVMIR(mod, llvmContext);
 	if (!llvmModule) {
-		llvm::errs() << "Failed to emit LLVM IR\n";
+		llvm::errs() << "Failed to convert to llvm engine\n";
 		return -1;
 	}
 
-	llvm::InitializeNativeTarget();
-	llvm::InitializeNativeTargetAsmPrinter();
 
-	auto tmBuilderOrError =
-		llvm::orc::JITTargetMachineBuilder::detectHost();
-	if (!tmBuilderOrError) {
-		llvm::errs() << "Could not create JITTargetMachineBuilder\n";
-		return -1;
-	}
+	// auto tmBuilderOrError =
+	// 	llvm::orc::JITTargetMachineBuilder::detectHost();
+	// if (!tmBuilderOrError) {
+	// 	llvm::errs() << "Could not create JITTargetMachineBuilder\n";
+	// 	return -1;
+	// }
 
-	auto tmOrError = tmBuilderOrError->createTargetMachine();
-	if (!tmOrError) {
-		llvm::errs() << "Could not create TargetMachine\n";
-		return -1;
-	}
-	mlir::ExecutionEngine::setupTargetTripleAndDataLayout(
-		llvmModule.get(), tmOrError.get().get()
-	);
+	// auto tmOrError = tmBuilderOrError->createTargetMachine();
+	// if (!tmOrError) {
+	// 	llvm::errs() << "Could not create TargetMachine\n";
+	// 	return -1;
+	// }
+	// mlir::ExecutionEngine::setupTargetTripleAndDataLayout(
+	// 	llvmModule.get(), tmOrError.get().get()
+	// );
 
 	/// Optionally run an optimization pipeline over the llvm module.
 	auto optPipeline = mlir::makeOptimizingTransformer(
@@ -136,11 +141,11 @@ int main() {
 		/*sizeLevel=*/0,
 		/*targetMachine=*/nullptr
 	);
-	if (auto err = optPipeline(llvmModule.get())) {
-		llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
-		return -1;
-	}
-	llvm::errs() << *llvmModule << "\n\n====EXECUTING====\n\n";
+	// if (auto err = optPipeline(llvmModule.get())) {
+	// 	llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
+	// 	return -1;
+	// }
+	llvm::errs() << "\n\n====EXECUTING====\n\n";
 	mlir::ExecutionEngineOptions engineOptions;
 	engineOptions.transformer = optPipeline;
 	auto maybeEngine = mlir::ExecutionEngine::create(mod, engineOptions);
