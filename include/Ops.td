@@ -109,7 +109,7 @@ def ReturnOp : Scad_Op<"return", [Pure, HasParent<"FuncOp">,
   let summary = "return operation";
 
 
-  let arguments = (ins Variadic<I32Tensor>:$input);
+  let arguments = (ins Variadic<AnyTypeOf<[I32MemRef, I32]>>:$input);
 
   let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
 
@@ -129,7 +129,7 @@ def YieldOp : Scad_Op<"yield", [Pure, HasParent<"ConditionalOp">,
   let summary = "yield operation to provide a value for a conditional";
 
 
-  let arguments = (ins Variadic<I32Tensor>:$input);
+  let arguments = (ins Variadic<AnyTypeOf<[I32MemRef, I32]>>:$input);
 
   let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
 
@@ -148,9 +148,9 @@ def GenericCallOp : Scad_Op<"generic_call",
     [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "generic call operation";
 
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<I32Tensor>:$inputs);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyTypeOf<[I32MemRef, I32]>>:$inputs);
 
-  let results = (outs I32Tensor);
+  let results = (outs AnyTypeOf<[I32MemRef, I32]>);
 
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)

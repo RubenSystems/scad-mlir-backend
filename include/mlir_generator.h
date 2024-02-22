@@ -49,6 +49,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 using llvm::ArrayRef;
 using llvm::cast;
@@ -61,7 +62,7 @@ using llvm::Twine;
 
 struct Alloc {
 	mlir::Value val;
-	bool freed; 
+	bool freed;
 };
 
 class SCADMIRLowering {
@@ -69,11 +70,13 @@ class SCADMIRLowering {
 	SCADMIRLowering(
 		mlir::MLIRContext & context,
 		mlir::OpBuilder & builder,
-		mlir::ModuleOp & mod
+		mlir::ModuleOp & mod,
+		void * type_query_engine
 	)
 		: context(context)
 		, builder(builder)
-		, mod(mod) {
+		, mod(mod)
+		, type_query_engine(type_query_engine) {
 	}
 
     public:
@@ -133,13 +136,45 @@ class SCADMIRLowering {
 	mlir::OpBuilder & builder;
 	mlir::ModuleOp & mod;
 	bool is_generating_main = false;
+	void * type_query_engine;
 
-	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
+	std::unordered_map<std::string, mlir::Type> function_results;
 	std::unordered_map<std::string, mlir::Value> variables;
 
 	std::unordered_map<std::string, Alloc> allocations;
 
     private:
+	FFIType query_type(std::string name) {
+		return query(type_query_engine, name.data());
+	}
+
+	mlir::Type get_magnitude_type_for(FFIApplication t) {
+		std::string tname(t.c.data, t.c.size);
+		if (tname == "i32") {
+			return builder.getI32Type();
+		}
+	}
+
+	mlir::Type get_type_for(FFIApplication t) {
+		std::vector<int64_t> dims = get_dims_for(t);
+		mlir::Type type = get_magnitude_type_for(t);
+
+		if (dims.size() == 0) {
+			return type;
+		} else {
+			return mlir::MemRefType::get(dims, type);
+		}
+	}
+
+	std::vector<int64_t> get_dims_for(FFIApplication t) {
+		if (t.dimensions_count == 0) {
+			return std::vector<int64_t>();
+		}
+		return std::vector<int64_t>(
+			t.dimensions, t.dimensions + t.dimensions_count
+		);
+	}
+
 	mlir::LogicalResult declare(std::string var, mlir::Value value) {
 		if (variables.find(var) != variables.end()) {
 			return mlir::failure();
@@ -229,7 +264,7 @@ class SCADMIRLowering {
 
 		if (decl.e1.tag == Tensor) {
 			Alloc alloc_flag;
-			alloc_flag.freed = false; 
+			alloc_flag.freed = false;
 			alloc_flag.val = r;
 			allocations[name] = alloc_flag;
 		}
@@ -262,7 +297,8 @@ class SCADMIRLowering {
 
 		return builder.create<mlir::scad::GenericCallOp>(
 			location,
-			mlir::RankedTensorType::get({ 2 }, builder.getI32Type()),
+			// mlir::RankedTensorType::get({ 2 }, builder.getI32Type()),
+			function_results[fname],
 			mlir::SymbolRefAttr::get(builder.getContext(), fname),
 			operands
 		);
@@ -315,20 +351,25 @@ class SCADMIRLowering {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("dropop"), 100, 100
 		);
-		// Currently drop assumes a variable reference. 
+		// Currently drop assumes a variable reference.
 		// auto arg = codegen(fc.params[0]);
 
-		std::string vrname  (fc.params[0].value.variable_reference.name.data, fc.params[0].value.variable_reference.name.size);
-		if (allocations.find(vrname) != allocations.end()){
+		std::string vrname(
+			fc.params[0].value.variable_reference.name.data,
+			fc.params[0].value.variable_reference.name.size
+		);
+		if (allocations.find(vrname) != allocations.end()) {
 			Alloc & alloced = allocations[vrname];
-			if (!alloced.freed){
+			if (!alloced.freed) {
 				// builder.create<mlir::scad::DropOp>(location, alloced.val);
-				auto dealloc = builder.create<mlir::memref::DeallocOp>(location, alloced.val);
+				auto dealloc =
+					builder.create<mlir::memref::DeallocOp>(
+						location, alloced.val
+					);
 				alloced.freed = true;
 			}
 		}
 
-		
 		return mlir::success();
 	}
 
@@ -390,21 +431,28 @@ class SCADMIRLowering {
 		);
 	}
 
-	mlir::scad::FuncOp proto_gen(FFIHIRFunctionDecl ffd) {
+	mlir::scad::FuncOp
+	proto_gen(FFIHIRFunctionDecl ffd, FFIType function_type) {
 		std::string name = std::string(ffd.name.data, ffd.name.size);
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, name + "PROTO", 100, 100
 		);
 
-		llvm::SmallVector<mlir::Type, 4> argTypes(
-			ffd.arg_len,
-			mlir::RankedTensorType::get(2, builder.getI32Type())
-		);
-		auto funcType = builder.getFunctionType(argTypes, std::nullopt);
+		llvm::SmallVector<mlir::Type, 4> arg_types;
+		for (int i = 0; i < ffd.arg_len; i++) {
+			arg_types.push_back(get_type_for(function_type.apps[i])
+			);
+		}
 
-		return builder.create<mlir::scad::FuncOp>(
-			location, name, funcType
-		);
+		auto type = builder.getFunctionType(arg_types, std::nullopt);
+
+		if (name != "main") {
+			function_results[name] = get_type_for(
+				function_type.apps[function_type.size - 1]
+			);
+		}
+
+		return builder.create<mlir::scad::FuncOp>(location, name, type);
 	}
 
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
@@ -414,8 +462,10 @@ class SCADMIRLowering {
 			&context, name + " Decl", 100, 100
 		);
 		// Create an MLIR function for the given prototype.
+		FFIType type = query_type(name);
+
 		builder.setInsertionPointToEnd(mod.getBody());
-		mlir::scad::FuncOp function = proto_gen(decl);
+		mlir::scad::FuncOp function = proto_gen(decl, type);
 
 		mlir::Block & entryBlock = function.front();
 
@@ -425,7 +475,7 @@ class SCADMIRLowering {
 						    decl.arg_names[i].data,
 						    decl.arg_names[i].size
 					    ),
-					    entryBlock.getArguments()[0])
+					    entryBlock.getArguments()[i])
 			    )) {
 				std::cout << "i failed you. srry";
 				return nullptr;
@@ -452,9 +502,7 @@ class SCADMIRLowering {
 			// the function.
 			function.setType(builder.getFunctionType(
 				function.getFunctionType().getInputs(),
-				mlir::RankedTensorType::get(
-					2, builder.getI32Type()
-				)
+				get_type_for(type.apps[type.size - 1])
 			));
 		}
 

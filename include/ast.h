@@ -4,10 +4,22 @@
 #include <string>
 #include <stddef.h>
 
+// AST Types
 extern "C" {
 	struct FFIString {
 		const char * data;
 		size_t size;
+	};
+
+	struct FFIApplication {
+		struct FFIString c;
+		const uint32_t * dimensions;
+		size_t dimensions_count;
+	};
+
+	struct FFIType {
+		size_t size;
+		struct FFIApplication * apps;
 	};
 
 	struct FFIHIRTensor {
@@ -111,4 +123,10 @@ extern "C" {
 		FFIHIRTag tag;
 		ExpressionUnion value;
 	};
+}
+
+// functionality
+extern "C" {
+	struct FFIHIRExpr compile(const char *, void **);
+	struct FFIType query(void *, const char *);
 }

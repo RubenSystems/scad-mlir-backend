@@ -305,25 +305,20 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 			// Assumes funcitons have more then one restype
 			auto res_type =
 				adaptor.getFunctionType().getResults()[0];
-			auto result_type =
-				llvm::cast<RankedTensorType>(res_type);
 
-			SmallVector<mlir::Type, 4> lowered_operands;
-			for (auto & input_type :
-			     op.getFunctionType().getInputs()) {
-				auto param_type =
-					llvm::cast<RankedTensorType>(input_type
-					);
-				lowered_operands.push_back(
-					convert_tensor_type_to_memref_type(
-						param_type
-					)
-				);
-			}
+			// SmallVector<mlir::Type, 4> lowered_operands;
+			// for (auto & input_type :
+			//      op.getFunctionType().getInputs()) {
+			// 	auto param_type =
+			// 		llvm::cast<RankedTensorType>(input_type
+			// 		);
+			// 	lowered_operands.push_back(
+
+			// 	);
+			// }
 
 			auto function_type = rewriter.getFunctionType(
-				lowered_operands,
-				convert_tensor_type_to_memref_type(result_type)
+				op.getFunctionType().getInputs(), res_type
 			);
 
 			auto func = rewriter.create<mlir::func::FuncOp>(
@@ -480,14 +475,11 @@ struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 		StringRef callee = op.getCalleeAttrName();
 
 		auto inputs = adaptor.getInputs();
-		auto input_type =
-			llvm::cast<RankedTensorType>((*op->result_type_begin())
-			);
 
 		auto call_op = rewriter.replaceOpWithNewOp<func::CallOp>(
 			op,
 			callee,
-			convert_tensor_type_to_memref_type(input_type),
+			*op->result_type_begin(),
 			adaptor.getOperands()
 		);
 		call_op->setAttrs(op->getAttrs());
