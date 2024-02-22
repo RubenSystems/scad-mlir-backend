@@ -1,13 +1,15 @@
-fn main() 2xi32;
-
-fn add_200(a: 2xi32, b: 2xi32) 2xi32 {
-	@add(a: a, b: @add(a: b, b: @{200, 200}))
+fn do(a: 2xi32, b: 2xi32) 2xi32 {
+	@{300, 400}
 };
 
-fn main() 2xi32 {
-	let mut x: 2xi32 = @{700, 800};
 
-	@print(value: x);
+fn main() i32 {
+	let mut x: i32 = 100;
+	
+	let mut container: 2xi32 = @{x, x};
+
+
+	let mut y: 2xi32 = do(a: container, b: container);
 
 	x
 };

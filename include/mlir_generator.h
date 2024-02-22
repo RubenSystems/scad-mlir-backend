@@ -20,11 +20,36 @@
 #include "Dialect.h"
 #include "ast.h"
 
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinDialect.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/ValueRange.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/TypeID.h"
+#include "mlir/IR/IntegerSet.h"
+
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Sequence.h"
+#include "llvm/Support/Casting.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 using llvm::ArrayRef;
 using llvm::cast;
@@ -35,16 +60,23 @@ using llvm::SmallVector;
 using llvm::StringRef;
 using llvm::Twine;
 
+struct Alloc {
+	mlir::Value val;
+	bool freed;
+};
+
 class SCADMIRLowering {
     public:
 	SCADMIRLowering(
 		mlir::MLIRContext & context,
 		mlir::OpBuilder & builder,
-		mlir::ModuleOp & mod
+		mlir::ModuleOp & mod,
+		void * type_query_engine
 	)
 		: context(context)
 		, builder(builder)
-		, mod(mod) {
+		, mod(mod)
+		, type_query_engine(type_query_engine) {
 	}
 
     public:
@@ -79,8 +111,8 @@ class SCADMIRLowering {
 		switch (value.tag) {
 		case Tensor:
 			return scad_vector(value.value.tensor);
-		// case Integer:
-		// 	break;
+		case Integer:
+			return scad_integer(value.value.integer);
 		case VariableReference:
 			return variables[std::string(
 				value.value.variable_reference.name.data,
@@ -104,11 +136,45 @@ class SCADMIRLowering {
 	mlir::OpBuilder & builder;
 	mlir::ModuleOp & mod;
 	bool is_generating_main = false;
+	void * type_query_engine;
 
-	std::unordered_map<std::string, mlir::scad::FuncOp> functions;
+	std::unordered_map<std::string, mlir::Type> function_results;
 	std::unordered_map<std::string, mlir::Value> variables;
 
+	std::unordered_map<std::string, Alloc> allocations;
+
     private:
+	FFIType query_type(std::string name) {
+		return query(type_query_engine, name.data());
+	}
+
+	mlir::Type get_magnitude_type_for(FFIApplication t) {
+		std::string tname(t.c.data, t.c.size);
+		if (tname == "i32") {
+			return builder.getI32Type();
+		}
+	}
+
+	mlir::Type get_type_for(FFIApplication t) {
+		std::vector<int64_t> dims = get_dims_for(t);
+		mlir::Type type = get_magnitude_type_for(t);
+
+		if (dims.size() == 0) {
+			return type;
+		} else {
+			return mlir::MemRefType::get(dims, type);
+		}
+	}
+
+	std::vector<int64_t> get_dims_for(FFIApplication t) {
+		if (t.dimensions_count == 0) {
+			return std::vector<int64_t>();
+		}
+		return std::vector<int64_t>(
+			t.dimensions, t.dimensions + t.dimensions_count
+		);
+	}
+
 	mlir::LogicalResult declare(std::string var, mlir::Value value) {
 		if (variables.find(var) != variables.end()) {
 			return mlir::failure();
@@ -117,23 +183,39 @@ class SCADMIRLowering {
 		return mlir::success();
 	}
 
-	mlir::DenseIntElementsAttr scad_matrix(FFIHIRTensor arr) {
-		std::vector<uint32_t> data;
+	mlir::MemRefType
+	create_memref_type(mlir::ArrayRef<int64_t> shape, mlir::Type type) {
+		return mlir::MemRefType::get(shape, type);
+	}
 
-		for (size_t i = 0; i < arr.size; i++) {
-			data.push_back((uint32_t)arr.vals[i].value.integer.value
-			);
-		}
+	// mlir::DenseIntElementsAttr scad_matrix(FFIHIRTensor arr) {
+	// 	std::vector<uint32_t> data;
 
-		// The type of this attribute is tensor of 64-bit floating-point with the
-		// shape of the literal.
-		mlir::Type elementType = builder.getI32Type();
-		auto dataType = mlir::RankedTensorType::get(
-			{ (long long)arr.size }, elementType
+	// 	for (size_t i = 0; i < arr.size; i++) {
+	// 		data.push_back((uint32_t)arr.vals[i].value.integer.value
+	// 		);
+	// 	}
+
+	// 	// The type of this attribute is tensor of 64-bit floating-point with the
+	// 	// shape of the literal.
+	// 	mlir::Type elementType = builder.getI32Type();
+	// 	auto dataType = mlir::RankedTensorType::get(
+	// 		{ (long long)arr.size }, elementType
+	// 	);
+	// 	return mlir::DenseIntElementsAttr::get(
+	// 		dataType, llvm::ArrayRef(data)
+	// 	);
+	// }
+
+	mlir::Value scad_integer(FFIHIRInteger i) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, "Integer literal", 100, 100
 		);
-		return mlir::DenseIntElementsAttr::get(
-			dataType, llvm::ArrayRef(data)
+
+		auto attr = mlir::IntegerAttr::get(
+			builder.getI32Type(), mlir::APInt(32, i.value)
 		);
+		return builder.create<mlir::arith::ConstantOp>(location, attr);
 	}
 
 	mlir::Value scad_vector(FFIHIRTensor arr) {
@@ -144,9 +226,31 @@ class SCADMIRLowering {
 			100
 		);
 
-		return builder.create<mlir::scad::VectorOp>(
-			location, scad_matrix(arr)
+		auto alloc = builder.create<mlir::memref::AllocOp>(
+			location,
+			create_memref_type(arr.size, builder.getI32Type())
 		);
+		auto * parentBlock = alloc->getBlock();
+
+		for (int i = 0; i < arr.size; i++) {
+			SmallVector<mlir::Value, 2> indices;
+			auto value_at_index = codegen(arr.vals[i]);
+			indices.push_back(
+				builder.create<mlir::arith::ConstantIndexOp>(
+					location, i
+				)
+			);
+			builder.create<mlir::affine::AffineStoreOp>(
+				location,
+				value_at_index,
+				alloc,
+				llvm::ArrayRef(indices)
+			);
+		}
+
+		// alloc->moveBefore(&parentBlock->front());
+
+		return alloc;
 	}
 
 	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
@@ -157,6 +261,14 @@ class SCADMIRLowering {
 		// 	location, scad_matrix(decl.e1.value.array)
 		// );
 		auto r = codegen(decl.e1);
+
+		if (decl.e1.tag == Tensor) {
+			Alloc alloc_flag;
+			alloc_flag.freed = false;
+			alloc_flag.val = r;
+			allocations[name] = alloc_flag;
+		}
+
 		std::cout << name << std::endl;
 		variables[name] = r;
 
@@ -185,7 +297,8 @@ class SCADMIRLowering {
 
 		return builder.create<mlir::scad::GenericCallOp>(
 			location,
-			mlir::RankedTensorType::get({ 2 }, builder.getI32Type()),
+			// mlir::RankedTensorType::get({ 2 }, builder.getI32Type()),
+			function_results[fname],
 			mlir::SymbolRefAttr::get(builder.getContext(), fname),
 			operands
 		);
@@ -238,11 +351,25 @@ class SCADMIRLowering {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, std::string("dropop"), 100, 100
 		);
-		auto arg = codegen(fc.params[0]);
-		if (!arg)
-			return mlir::failure();
+		// Currently drop assumes a variable reference.
+		// auto arg = codegen(fc.params[0]);
 
-		builder.create<mlir::scad::DropOp>(location, arg);
+		std::string vrname(
+			fc.params[0].value.variable_reference.name.data,
+			fc.params[0].value.variable_reference.name.size
+		);
+		if (allocations.find(vrname) != allocations.end()) {
+			Alloc & alloced = allocations[vrname];
+			if (!alloced.freed) {
+				// builder.create<mlir::scad::DropOp>(location, alloced.val);
+				auto dealloc =
+					builder.create<mlir::memref::DeallocOp>(
+						location, alloced.val
+					);
+				alloced.freed = true;
+			}
+		}
+
 		return mlir::success();
 	}
 
@@ -304,21 +431,28 @@ class SCADMIRLowering {
 		);
 	}
 
-	mlir::scad::FuncOp proto_gen(FFIHIRFunctionDecl ffd) {
+	mlir::scad::FuncOp
+	proto_gen(FFIHIRFunctionDecl ffd, FFIType function_type) {
 		std::string name = std::string(ffd.name.data, ffd.name.size);
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, name + "PROTO", 100, 100
 		);
 
-		llvm::SmallVector<mlir::Type, 4> argTypes(
-			ffd.arg_len,
-			mlir::RankedTensorType::get(2, builder.getI32Type())
-		);
-		auto funcType = builder.getFunctionType(argTypes, std::nullopt);
+		llvm::SmallVector<mlir::Type, 4> arg_types;
+		for (int i = 0; i < ffd.arg_len; i++) {
+			arg_types.push_back(get_type_for(function_type.apps[i])
+			);
+		}
 
-		return builder.create<mlir::scad::FuncOp>(
-			location, name, funcType
-		);
+		auto type = builder.getFunctionType(arg_types, std::nullopt);
+
+		if (name != "main") {
+			function_results[name] = get_type_for(
+				function_type.apps[function_type.size - 1]
+			);
+		}
+
+		return builder.create<mlir::scad::FuncOp>(location, name, type);
 	}
 
 	mlir::scad::FuncOp scad_func(FFIHIRFunctionDecl decl) {
@@ -328,8 +462,10 @@ class SCADMIRLowering {
 			&context, name + " Decl", 100, 100
 		);
 		// Create an MLIR function for the given prototype.
+		FFIType type = query_type(name);
+
 		builder.setInsertionPointToEnd(mod.getBody());
-		mlir::scad::FuncOp function = proto_gen(decl);
+		mlir::scad::FuncOp function = proto_gen(decl, type);
 
 		mlir::Block & entryBlock = function.front();
 
@@ -339,7 +475,7 @@ class SCADMIRLowering {
 						    decl.arg_names[i].data,
 						    decl.arg_names[i].size
 					    ),
-					    entryBlock.getArguments()[0])
+					    entryBlock.getArguments()[i])
 			    )) {
 				std::cout << "i failed you. srry";
 				return nullptr;
@@ -366,9 +502,7 @@ class SCADMIRLowering {
 			// the function.
 			function.setType(builder.getFunctionType(
 				function.getFunctionType().getInputs(),
-				mlir::RankedTensorType::get(
-					2, builder.getI32Type()
-				)
+				get_type_for(type.apps[type.size - 1])
 			));
 		}
 
@@ -401,7 +535,6 @@ class SCADMIRLowering {
 				location, ArrayRef(ret_val)
 			);
 		}
-		
 
 		return mlir::success();
 	}

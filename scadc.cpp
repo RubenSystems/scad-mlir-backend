@@ -33,18 +33,13 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
-extern "C" {
-	FFIHIRExpr compile(const char *);
-}
-
-int main(int argc, const char* argv[]) {
+int main(int argc, const char * argv[]) {
 	mlir::registerAsmPrinterCLOptions();
 	mlir::registerMLIRContextCLOptions();
 	mlir::registerPassManagerCLOptions();
 
-
-
-	FFIHIRExpr x = compile(argv[1]);
+	void * query_engine = nullptr;
+	FFIHIRExpr x = compile(argv[1], &query_engine);
 
 	mlir::DialectRegistry registry;
 	mlir::func::registerAllExtensions(registry);
@@ -54,9 +49,11 @@ int main(int argc, const char* argv[]) {
 	mlir::ModuleOp mod = mlir::ModuleOp::create(builder.getUnknownLoc());
 	mlir::OwningOpRef<mlir::ModuleOp> owned_mod = mod;
 	context.getOrLoadDialect<mlir::scad::SCADDialect>();
+	context.getOrLoadDialect<mlir::arith::ArithDialect>();
+	context.getOrLoadDialect<mlir::memref::MemRefDialect>();
+	context.getOrLoadDialect<mlir::affine::AffineDialect>();
 
-	SCADMIRLowering scad_lowerer(context, builder, mod);
-
+	SCADMIRLowering scad_lowerer(context, builder, mod, query_engine);
 	scad_lowerer.codegen(x);
 
 	// auto function_a = generate_mlir_func_v2(builder, mod, context);
@@ -117,7 +114,6 @@ int main(int argc, const char* argv[]) {
 		llvm::errs() << "Failed to convert to llvm engine\n";
 		return -1;
 	}
-
 
 	// auto tmBuilderOrError =
 	// 	llvm::orc::JITTargetMachineBuilder::detectHost();
