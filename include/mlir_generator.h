@@ -135,7 +135,11 @@ class SCADMIRLowering {
 	mlir::MLIRContext & context;
 	mlir::OpBuilder & builder;
 	mlir::ModuleOp & mod;
+
+	// Messages to passdown funtions 
 	bool is_generating_main = false;
+	bool should_force_index_type = false;
+
 	void * type_query_engine;
 
 	std::unordered_map<std::string, mlir::Type> function_results;
@@ -151,7 +155,13 @@ class SCADMIRLowering {
 	mlir::Type get_magnitude_type_for(FFIApplication t) {
 		std::string tname(t.c.data, t.c.size);
 		if (tname == "i32") {
+			std::cout << "I32 -" << std::endl;
 			return builder.getI32Type();
+		} else if (tname == "f32") {
+			std::cout << "F32 -" << std::endl;
+			return builder.getF32Type();
+		} else {
+			std::cout << "SOMETHING WENT REALLY WRONG" << std::endl;
 		}
 	}
 
@@ -170,9 +180,12 @@ class SCADMIRLowering {
 		if (t.dimensions_count == 0) {
 			return std::vector<int64_t>();
 		}
-		return std::vector<int64_t>(
+
+		std::vector<int64_t> dims(
 			t.dimensions, t.dimensions + t.dimensions_count
 		);
+
+		return dims;
 	}
 
 	mlir::LogicalResult declare(std::string var, mlir::Value value) {
@@ -216,12 +229,13 @@ class SCADMIRLowering {
 			builder.getI32Type(), mlir::APInt(32, i.value)
 		);
 		return builder.create<mlir::arith::ConstantOp>(location, attr);
+	
 	}
 
 	mlir::Value scad_vector(FFIHIRTensor arr) {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context,
-			"lololololol you though i would be helpful??!!?",
+			"lololololol you though i would be helpful?!!?",
 			100,
 			100
 		);
@@ -230,9 +244,9 @@ class SCADMIRLowering {
 			location,
 			create_memref_type(arr.size, builder.getI32Type())
 		);
-		auto * parentBlock = alloc->getBlock();
+		// auto * parentBlock = alloc->getBlock();
 
-		for (int i = 0; i < arr.size; i++) {
+		for (size_t i = 0; i < arr.size; i++) {
 			SmallVector<mlir::Value, 2> indices;
 			auto value_at_index = codegen(arr.vals[i]);
 			indices.push_back(
@@ -362,10 +376,9 @@ class SCADMIRLowering {
 			Alloc & alloced = allocations[vrname];
 			if (!alloced.freed) {
 				// builder.create<mlir::scad::DropOp>(location, alloced.val);
-				auto dealloc =
-					builder.create<mlir::memref::DeallocOp>(
-						location, alloced.val
-					);
+				builder.create<mlir::memref::DeallocOp>(
+					location, alloced.val
+				);
 				alloced.freed = true;
 			}
 		}
@@ -383,9 +396,12 @@ class SCADMIRLowering {
 			return nullptr;
 		} else if (name == "@add") {
 			return scad_add(fc);
-		} else if (name == "@index") {
+		} else if (name == "@index.i32") {
 			return scad_index(fc);
-		} else if (name == "@drop") {
+		} else if (name == "@drop.i32") {
+			// no need to drop an i32
+			return nullptr;
+		} else if (name == "@drop.tensori32") {
 			scad_drop(fc);
 			return nullptr;
 		}
@@ -406,7 +422,7 @@ class SCADMIRLowering {
 
 		return builder.create<mlir::scad::AddOp>(
 			location,
-			mlir::RankedTensorType::get(2, builder.getI32Type()),
+			builder.getI32Type(),
 			operands[0],
 			operands[1]
 		);
@@ -418,16 +434,12 @@ class SCADMIRLowering {
 		);
 
 		// Codegen the operands first.
-		SmallVector<mlir::Value, 4> operands;
-		for (size_t i = 0; i < fc.param_len; i++) {
-			auto arg = codegen(fc.params[i]);
-			if (!arg)
-				return nullptr;
-			operands.push_back(arg);
-		}
+		auto array = codegen(fc.params[0]);
+		auto index = codegen(fc.params[1]);
+		auto index_cnst = builder.create<mlir::arith::IndexCastOp>(location, builder.getIndexType(), index);
 
 		return builder.create<mlir::scad::IndexOp>(
-			location, builder.getI32Type(), operands[0], operands[1]
+			location, builder.getI32Type(), array, index_cnst
 		);
 	}
 
@@ -439,9 +451,11 @@ class SCADMIRLowering {
 		);
 
 		llvm::SmallVector<mlir::Type, 4> arg_types;
-		for (int i = 0; i < ffd.arg_len; i++) {
-			arg_types.push_back(get_type_for(function_type.apps[i])
-			);
+		std::cout << name << " ARGLEN - " << ffd.arg_len << std::endl;
+		for (size_t i = 0; i < ffd.arg_len; i++) {
+			auto type = get_type_for(function_type.apps[i]);
+			type.dump();
+			arg_types.push_back(type);
 		}
 
 		auto type = builder.getFunctionType(arg_types, std::nullopt);
@@ -500,9 +514,12 @@ class SCADMIRLowering {
 		} else if (returnOp.hasOperand() && name != "main") {
 			// Otherwise, if this return operation has an operand then add a result to
 			// the function.
+			auto rettype = get_type_for(type.apps[type.size - 1]);
+
+			rettype.dump();
 			function.setType(builder.getFunctionType(
 				function.getFunctionType().getInputs(),
-				get_type_for(type.apps[type.size - 1])
+				rettype
 			));
 		}
 
@@ -519,19 +536,20 @@ class SCADMIRLowering {
 			&context, std::string("RETURN STATEMENT!!!"), 100, 100
 		);
 
-		std::string refer = std::string(
-			ret.res.value.variable_reference.name.data,
-			ret.res.value.variable_reference.name.size
-		);
+		// std::string refer = std::string(
+		// 	ret.res.value.variable_reference.name.data,
+		// 	ret.res.value.variable_reference.name.size
+		// );
+		
 
-		auto ret_val = variables[refer];
 
 		if (is_generating_main) {
-			auto retop = builder.create<mlir::scad::ReturnOp>(
-				location /*, ArrayRef(ret_val)*/
+			builder.create<mlir::scad::ReturnOp>(
+				location
 			);
 		} else {
-			auto retop = builder.create<mlir::scad::ReturnOp>(
+			auto ret_val = codegen(ret.res);
+			builder.create<mlir::scad::ReturnOp>(
 				location, ArrayRef(ret_val)
 			);
 		}

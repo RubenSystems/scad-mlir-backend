@@ -164,7 +164,7 @@ def GenericCallOp : Scad_Op<"generic_call",
 def PrintOp : Scad_Op<"print"> {
 
 
-  let arguments = (ins AnyTypeOf<[I32Tensor, I32MemRef]>:$input);
+  let arguments = (ins I32:$input);
 
   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
@@ -174,8 +174,8 @@ def AddOp : Scad_Op<"add",
     [Pure]> {
   let summary = "element-wise addition operation";
 
-  let arguments = (ins I32Tensor:$lhs, I32Tensor:$rhs);
-  let results = (outs I32Tensor);
+  let arguments = (ins I32:$lhs, I32:$rhs);
+  let results = (outs I32);
 
   // Indicate that the operation has a custom parser and printer method.
   // let hasCustomAssemblyFormat = 1;
@@ -201,7 +201,7 @@ def IndexOp : Scad_Op<"index",
     [Pure]> {
   let summary = "Get element from tensor at index";
 
-  let arguments = (ins I32Tensor:$value, I32Tensor:$index);
+  let arguments = (ins I32MemRef:$value, Index:$index);
   let results = (outs I32);
 
   let builders = [
