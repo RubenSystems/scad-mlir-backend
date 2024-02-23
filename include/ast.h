@@ -74,13 +74,22 @@ extern "C" {
 		union ValueUnion value;
 	};
 
+	struct FFIHIRForLoop {
+		struct FFIString iv;
+		struct FFIHIRValue start;
+		struct FFIHIRValue end;
+		const struct FFIHIRExpr * block;
+		const struct FFIHIRExpr * e2;
+	};
+
 	enum FFIHIRTag {
 		VariableDecl = 0,
 		Noop = 1,
 		FunctionDecl = 2,
 		ForwardFunctionDecl = 3,
 		Return = 4,
-		Yield = 5
+		Yield = 5,
+		For = 6
 	};
 
 	struct FFIHIRVariableDecl {
@@ -117,6 +126,7 @@ extern "C" {
 		uint8_t noop;
 		struct FFIHIRReturn ret;
 		struct FFIHIRYield yld;
+		struct FFIHIRForLoop floop;
 	};
 
 	struct FFIHIRExpr {

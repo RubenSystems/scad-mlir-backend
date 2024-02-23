@@ -75,45 +75,6 @@ namespace {
 				parentModule
 			);
 
-			// Create a loop for each of the dimensions within the shape.
-			// SmallVector<Value, 4> loopIvs;
-			// for (unsigned i = 0, e = memRefShape.size(); i != e;
-			//      ++i) {
-			// 	auto lowerBound =
-			// 		rewriter.create<arith::ConstantIndexOp>(
-			// 			loc, 0
-			// 		);
-			// 	auto upperBound =
-			// 		rewriter.create<arith::ConstantIndexOp>(
-			// 			loc, memRefShape[i]
-			// 		);
-			// 	auto step =
-			// 		rewriter.create<arith::ConstantIndexOp>(
-			// 			loc, 1
-			// 		);
-			// 	auto loop = rewriter.create<scf::ForOp>(
-			// 		loc, lowerBound, upperBound, step
-			// 	);
-			// 	for (Operation & nested : *loop.getBody())
-			// 		rewriter.eraseOp(&nested);
-			// 	loopIvs.push_back(loop.getInductionVar());
-
-			// 	// Terminate the loop body.
-			// 	rewriter.setInsertionPointToEnd(loop.getBody());
-
-			// 	// Insert a newline after each of the inner dimensions of the shape.
-			// 	if (i != e - 1)
-			// 		rewriter.create<LLVM::CallOp>(
-			// 			loc,
-			// 			getPrintfType(context),
-			// 			printfRef,
-			// 			newLineCst
-			// 		);
-			// 	rewriter.create<scf::YieldOp>(loc);
-			// 	rewriter.setInsertionPointToStart(loop.getBody()
-			// 	);
-			// }
-
 			// Generate a call to printf for the current element of the loop.
 			auto printOp = cast<scad::PrintOp>(op);
 			// auto elementLoad = rewriter.create<memref::LoadOp>(

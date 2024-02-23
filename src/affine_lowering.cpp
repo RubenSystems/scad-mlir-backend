@@ -162,7 +162,6 @@ using LoopIterationFn = function_ref<
 // 	}
 // };
 
-
 // using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddIOp>;
 struct AddOpLowering : public OpConversionPattern<scad::AddOp> {
 	using OpConversionPattern<scad::AddOp>::OpConversionPattern;
@@ -273,7 +272,6 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 		mlir::scad::FuncOpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-
 		if (op.getName() == "main") {
 			auto func = rewriter.create<mlir::func::FuncOp>(
 				op.getLoc(), op.getName(), op.getFunctionType()
@@ -434,9 +432,7 @@ struct IndexOpLowering : public OpConversionPattern<scad::IndexOp> {
 		// 	)
 		// );
 		auto memRef = rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(
-			op,
-			adaptor.getValue(),
-			op.getODSOperands(1)
+			op, adaptor.getValue(), op.getODSOperands(1)
 		);
 
 		return success();
