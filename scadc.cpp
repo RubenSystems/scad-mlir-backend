@@ -80,11 +80,18 @@ int main(int argc, const char * argv[]) {
 
 	{
 		mlir::OpPassManager & optPM = pm.nest<mlir::func::FuncOp>();
+		// -affine-loop-unroll  -affine-super-vectorize -affine-parallelize -affine-expand-index-ops
 		optPM.addPass(mlir::createCanonicalizerPass());
 		optPM.addPass(mlir::createCSEPass());
 		optPM.addPass(mlir::affine::createLoopFusionPass());
 		optPM.addPass(mlir::affine::createAffineScalarReplacementPass()
 		);
+		optPM.addPass(mlir::affine::createLoopUnrollPass());
+		optPM.addPass(mlir::affine::createLoopTilingPass());
+		// optPM.addPass(mlir::affine::createAffineParallelizePass());
+		optPM.addPass(mlir::createCanonicalizerPass());
+		optPM.addPass(mlir::createCSEPass());
+
 	}
 	if (mlir::failed(pm.run(*owned_mod))) {
 		std::cout << "failed to run passes\n";
@@ -93,7 +100,6 @@ int main(int argc, const char * argv[]) {
 	std::cout << "\n\n\n";
 	owned_mod->dump();
 	std::cout << "\n\n\n";
-
 	pm.addPass(mlir::scad::createLowerToLLVMPass());
 	pm.addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
 	if (mlir::failed(pm.run(*owned_mod))) {

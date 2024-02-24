@@ -41,32 +41,32 @@ static MemRefType convert_tensor_type_to_memref_type(RankedTensorType type) {
 }
 
 /// Insert an allocation and deallocation for the given MemRefType.
-static Value insert_alloc_and_dealloc(
-	MemRefType type,
-	Location loc,
-	PatternRewriter & rewriter
-) {
-	auto alloc = rewriter.create<memref::AllocOp>(loc, type);
+// static Value insert_alloc_and_dealloc(
+// 	MemRefType type,
+// 	Location loc,
+// 	PatternRewriter & rewriter
+// ) {
+// 	auto alloc = rewriter.create<memref::AllocOp>(loc, type);
 
-	// Make sure to allocate at the beginning of the block.
-	auto * parentBlock = alloc->getBlock();
-	alloc->moveBefore(&parentBlock->front());
+// 	// Make sure to allocate at the beginning of the block.
+// 	auto * parentBlock = alloc->getBlock();
+// 	alloc->moveBefore(&parentBlock->front());
 
-	// Make sure to deallocate this alloc at the end of the block. This is fine
-	// as toy functions have no control flow.
-	auto dealloc = rewriter.create<memref::DeallocOp>(loc, alloc);
-	dealloc->moveBefore(&parentBlock->back());
-	return alloc;
-}
+// 	// Make sure to deallocate this alloc at the end of the block. This is fine
+// 	// as toy functions have no control flow.
+// 	auto dealloc = rewriter.create<memref::DeallocOp>(loc, alloc);
+// 	dealloc->moveBefore(&parentBlock->back());
+// 	return alloc;
+// }
 
 /// This defines the function type used to process an iteration of a lowered
 /// loop. It takes as input an OpBuilder, an range of memRefOperands
 /// corresponding to the operands of the input operation, and the range of loop
 /// induction variables for the iteration. It returns a value to store at the
 /// current index of the iteration.
-using LoopIterationFn = function_ref<
-	Value(OpBuilder & rewriter, ValueRange memRefOperands, ValueRange loopIvs
-	)>;
+// using LoopIterationFn = function_ref<
+// 	Value(OpBuilder & rewriter, ValueRange memRefOperands, ValueRange loopIvs
+// 	)>;
 
 // static void lowerOpToLoops(
 // 	Operation * op,
@@ -175,91 +175,6 @@ struct AddOpLowering : public OpConversionPattern<scad::AddOp> {
 			op, adaptor.getLhs(), adaptor.getRhs()
 		);
 
-		return success();
-	}
-};
-
-struct VectorOpLowering : public OpRewritePattern<scad::VectorOp> {
-	using OpRewritePattern<scad::VectorOp>::OpRewritePattern;
-
-	LogicalResult matchAndRewrite(
-		scad::VectorOp op,
-		PatternRewriter & rewriter
-	) const final {
-		DenseElementsAttr constantValue = op.getValue();
-		Location loc = op.getLoc();
-
-		// When lowering the constant operation, we allocate and assign the constant
-		// values to a corresponding memref allocation.
-		auto tensorType = llvm::cast<RankedTensorType>(op.getType());
-		auto memRefType =
-			convert_tensor_type_to_memref_type(tensorType);
-		auto alloc =
-			insert_alloc_and_dealloc(memRefType, loc, rewriter);
-
-		// We will be generating constant indices up-to the largest dimension.
-		// Create these constants up-front to avoid large amounts of redundant
-		// operations.
-		auto valueShape = memRefType.getShape();
-		SmallVector<Value, 8> constantIndices;
-
-		if (!valueShape.empty()) {
-			for (auto i : llvm::seq<int64_t>(
-				     0,
-				     *std::max_element(
-					     valueShape.begin(),
-					     valueShape.end()
-				     )
-			     ))
-				constantIndices.push_back(
-					rewriter.create<arith::ConstantIndexOp>(
-						loc, i
-					)
-				);
-		} else {
-			// This is the case of a tensor of rank 0.
-			constantIndices.push_back(
-				rewriter.create<arith::ConstantIndexOp>(loc, 0)
-			);
-		}
-
-		// The constant operation represents a multi-dimensional constant, so we
-		// will need to generate a store for each of the elements. The following
-		// functor recursively walks the dimensions of the constant shape,
-		// generating a store when the recursion hits the base case.
-		SmallVector<Value, 2> indices;
-		auto valueIt = constantValue.value_begin<IntegerAttr>();
-		std::function<void(uint64_t)> storeElements = [&](uint64_t dimension
-							      ) {
-			// The last dimension is the base case of the recursion, at this point
-			// we store the element at the given index.
-			if (dimension == valueShape.size()) {
-				rewriter.create<affine::AffineStoreOp>(
-					loc,
-					rewriter.create<arith::ConstantOp>(
-						loc, *valueIt++
-					),
-					alloc,
-					llvm::ArrayRef(indices)
-				);
-				return;
-			}
-
-			// Otherwise, iterate over the current dimension and add the indices to
-			// the list.
-			for (uint64_t i = 0, e = valueShape[dimension]; i != e;
-			     ++i) {
-				indices.push_back(constantIndices[i]);
-				storeElements(dimension + 1);
-				indices.pop_back();
-			}
-		};
-
-		// Start the element storing recursion from the first dimension.
-		storeElements(/*dimension=*/0);
-
-		// Replace this operation with the generated alloc.
-		rewriter.replaceOp(op, alloc);
 		return success();
 	}
 };
@@ -416,28 +331,28 @@ struct YieldOpLowering : public OpConversionPattern<scad::YieldOp> {
 	}
 };
 
-struct IndexOpLowering : public OpConversionPattern<scad::IndexOp> {
-	using OpConversionPattern<scad::IndexOp>::OpConversionPattern;
+// struct IndexOpLowering : public OpConversionPattern<scad::IndexOp> {
+// 	using OpConversionPattern<scad::IndexOp>::OpConversionPattern;
 
-	LogicalResult matchAndRewrite(
-		scad::IndexOp op,
-		OpAdaptor adaptor,
-		ConversionPatternRewriter & rewriter
-	) const final {
-		auto memRefType = op.getValue().getType();
-		SmallVector<Value, 8> constant_indicies;
-		// constant_indicies.push_back(
-		// 	rewriter.create<arith::ConstantIndexOp>(
-		// 		op.getLoc(), op.getODSOperands(1)
-		// 	)
-		// );
-		auto memRef = rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(
-			op, adaptor.getValue(), op.getODSOperands(1)
-		);
+// 	LogicalResult matchAndRewrite(
+// 		scad::IndexOp op,
+// 		OpAdaptor adaptor,
+// 		ConversionPatternRewriter & rewriter
+// 	) const final {
+// 		auto memRefType = op.getValue().getType();
+// 		SmallVector<Value, 8> constant_indicies;
+// 		// constant_indicies.push_back(
+// 		// 	rewriter.create<arith::ConstantIndexOp>(
+// 		// 		op.getLoc(), op.getODSOperands(1)
+// 		// 	)
+// 		// );
+// 		auto memRef = rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(
+// 			op, adaptor.getValue(), op.getODSOperands(1)
+// 		);
 
-		return success();
-	}
-};
+// 		return success();
+// 	}
+// };
 
 struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 	using OpConversionPattern<mlir::scad::GenericCallOp>::OpConversionPattern;
@@ -502,12 +417,10 @@ void SCADToAffineLoweringPass::runOnOperation() {
 
 	RewritePatternSet patterns(&getContext());
 	patterns
-		.add<VectorOpLowering,
-		     FuncOpLowering,
+		.add<FuncOpLowering,
 		     ReturnOpLowering,
 		     CallOpLowering,
 		     AddOpLowering,
-		     IndexOpLowering,
 		     ConditionalOpLowering,
 		     YieldOpLowering>(&getContext());
 

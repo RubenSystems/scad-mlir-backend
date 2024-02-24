@@ -274,23 +274,89 @@ class SCADMIRLowering {
 		return alloc;
 	}
 
+	mlir::LogicalResult scad_set(FFIHIRFunctionCall fc) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, "index_op", 100, 100
+		);
+
+		// Codegen the operands first.
+		auto array = codegen(fc.params[0]);
+		auto index = codegen(fc.params[1]);
+		auto value = codegen(fc.params[2]);
+		SmallVector<mlir::Value, 2> indices;
+		auto index_cnst = builder.create<mlir::arith::IndexCastOp>(
+			location, builder.getIndexType(), index
+		);
+		indices.push_back(index_cnst);
+
+		builder.create<mlir::affine::AffineStoreOp>(
+			location,
+			value,
+			array,
+			llvm::ArrayRef(indices)
+		);
+		
+		return mlir::success();
+	}
+
 	mlir::LogicalResult scad_for(FFIHIRForLoop floop) {
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, "for", 100, 100);
+
+		auto start_point = floop.start.value.integer.value;
+		auto end_point = floop.end.value.integer.value;
+
 		auto loop = builder.create<mlir::affine::AffineForOp>(
-			location, 0, 10, 1
+			location, start_point, end_point, 1
 		);
 		builder.setInsertionPointToStart(&loop.getRegion().front());
 
 		std::string ivname(floop.iv.data, floop.iv.size);
-		std::cout << ivname << "for" << std::endl;
 		variables[ivname] = builder.create<mlir::arith::IndexCastOp>(
 			location, builder.getI32Type(), loop.getInductionVar()
 		);
-
 		codegen(*floop.block);
-
 		builder.setInsertionPointAfter(loop);
+
+
+		codegen(*floop.e2);
+
+		return mlir::success();
+	}
+
+	mlir::LogicalResult scad_parallel(FFIHIRForLoop floop) {
+		mlir::Location location =
+			mlir::FileLineColLoc::get(&context, "parallel", 100, 100);
+
+		auto start_point = floop.start.value.integer.value;
+		auto end_point = floop.end.value.integer.value;
+
+
+		// llvm::SmallVector<mlir::AffineExpr, 8> lbExprs;
+		// llvm::SmallVector<mlir::AffineExpr, 8> ubExprs;
+		// lbExprs.push_back(builder.getAffineDimExpr(0) + start_point);
+		// ubExprs.push_back(builder.getAffineDimExpr(0) + end_point);
+
+		// auto smap = mlir::AffineMap::get(1, 0, lbExprs, builder.getContext());
+		// auto emap = mlir::AffineMap::get(1, 0, ubExprs, builder.getContext());
+
+		// llvm::SmallVector<mlir::Value, 8> outerIdxs;
+		// auto loop = builder.create<mlir::affine::AffineParallelOp>(
+		// 	location, smap, outerIdxs, emap, outerIdxs
+		// );
+
+
+
+		// builder.setInsertionPointToStart(&loop.getRegion().front());
+
+		// std::string ivname(floop.iv.data, floop.iv.size);
+		// variables[ivname] = builder.create<mlir::arith::IndexCastOp>(
+		// 	location, builder.getI32Type(), loop.getInductionVar()
+		// );
+
+		// codegen(*floop.block);
+
+		// builder.setInsertionPointAfter(loop);
 
 		codegen(*floop.e2);
 
@@ -429,11 +495,11 @@ class SCADMIRLowering {
 			return scad_add(fc);
 		} else if (name == "@index.i32") {
 			return scad_index(fc);
-		} else if (name == "@drop.i32") {
-			// no need to drop an i32
-			return nullptr;
 		} else if (name == "@drop.tensori32") {
 			scad_drop(fc);
+			return nullptr;
+		} else if (name == "@set.i32") {
+			scad_set(fc);
 			return nullptr;
 		}
 	}
@@ -464,12 +530,16 @@ class SCADMIRLowering {
 		// Codegen the operands first.
 		auto array = codegen(fc.params[0]);
 		auto index = codegen(fc.params[1]);
+
 		auto index_cnst = builder.create<mlir::arith::IndexCastOp>(
 			location, builder.getIndexType(), index
 		);
+		SmallVector<mlir::Value, 4> indicies;
+		indicies.push_back(index_cnst);
 
-		return builder.create<mlir::scad::IndexOp>(
-			location, builder.getI32Type(), array, index_cnst
+
+		return builder.create<mlir::affine::AffineLoadOp>(
+			location, array, indicies
 		);
 	}
 
