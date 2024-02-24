@@ -141,17 +141,21 @@ int main(int argc, const char * argv[]) {
 	// 	llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
 	// 	return -1;
 	// }
-	llvm::errs() << "\n\n====EXECUTING====\n\n";
-	mlir::ExecutionEngineOptions engineOptions;
-	engineOptions.transformer = optPipeline;
-	auto maybeEngine = mlir::ExecutionEngine::create(mod, engineOptions);
-	assert(maybeEngine && "failed to construct an execution engine");
-	auto & engine = maybeEngine.get();
+	std::error_code ec;
+	llvm::raw_fd_ostream dest("output.ll", ec, llvm::sys::fs::OF_None);
+	dest << *llvmModule;
+	llvm::errs() << *llvmModule << "\n";
+	// llvm::errs() << "\n\n====EXECUTING====\n\n";
+	// mlir::ExecutionEngineOptions engineOptions;
+	// engineOptions.transformer = optPipeline;
+	// auto maybeEngine = mlir::ExecutionEngine::create(mod, engineOptions);
+	// assert(maybeEngine && "failed to construct an execution engine");
+	// auto & engine = maybeEngine.get();
 
-	// Invoke the JIT-compiled function.
-	auto invocationResult = engine->invokePacked("main");
-	if (invocationResult) {
-		llvm::errs() << "JIT invocation failed\n";
-		return -1;
-	}
+	// // Invoke the JIT-compiled function.
+	// auto invocationResult = engine->invokePacked("main");
+	// if (invocationResult) {
+	// 	llvm::errs() << "JIT invocation failed\n";
+	// 	return -1;
+	// }
 }

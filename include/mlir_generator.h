@@ -526,6 +526,7 @@ class SCADMIRLowering {
 			}
 		}
 		builder.setInsertionPointToStart(&entryBlock);
+		// mlir::AutomaticAllocationScope allocationScope(builder);
 
 		// Emit the body of the function.
 		if (name == "main")

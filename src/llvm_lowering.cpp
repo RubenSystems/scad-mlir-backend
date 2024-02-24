@@ -64,7 +64,7 @@ namespace {
 				loc,
 				rewriter,
 				"frmt_spec",
-				StringRef("%i \0", 4),
+				StringRef("%i \n\0", 4),
 				parentModule
 			);
 			Value newLineCst = getOrCreateGlobalString(
