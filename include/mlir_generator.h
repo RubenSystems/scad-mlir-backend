@@ -163,11 +163,15 @@ class SCADMIRLowering {
 	mlir::Type get_magnitude_type_for(FFIApplication t) {
 		std::string tname(t.c.data, t.c.size);
 		if (tname == "i32") {
-			std::cout << "I32 -" << std::endl;
 			return builder.getI32Type();
 		} else if (tname == "f32") {
-			std::cout << "F32 -" << std::endl;
 			return builder.getF32Type();
+		} else if (tname == "i64") {
+			return builder.getI64Type();
+		} else if (tname == "i16") {
+			return builder.getI16Type();
+		} else if (tname == "ii") {
+			return builder.getIndexType();
 		} else {
 			std::cout << "SOMETHING WENT REALLY WRONG" << std::endl;
 		}
@@ -228,15 +232,39 @@ class SCADMIRLowering {
 	// 	);
 	// }
 
+	mlir::Type get_type_for_int_width(uint32_t width) {
+		switch (width) {
+		case 8:
+			return builder.getI8Type();
+		case 16:
+			return builder.getI16Type();
+		case 32:
+			return builder.getI32Type();
+		case 64:
+			return builder.getI64Type();
+		case 1000:
+			return builder.getIndexType();
+		}
+	}
+
 	mlir::Value scad_integer(FFIHIRInteger i) {
 		mlir::Location location = mlir::FileLineColLoc::get(
 			&context, "Integer literal", 100, 100
 		);
+		if (i.width == 1000) {
+			return builder.create<mlir::arith::ConstantIndexOp>(
+				location, i.value
+			);
+		} else {
+			auto attr = mlir::IntegerAttr::get(
+				get_type_for_int_width(i.width),
+				mlir::APInt(i.width, i.value)
+			);
 
-		auto attr = mlir::IntegerAttr::get(
-			builder.getI32Type(), mlir::APInt(32, i.value)
-		);
-		return builder.create<mlir::arith::ConstantOp>(location, attr);
+			return builder.create<mlir::arith::ConstantOp>(
+				location, attr
+			);
+		}
 	}
 
 	mlir::Value scad_vector(FFIHIRTensor arr) {
@@ -246,16 +274,20 @@ class SCADMIRLowering {
 			100,
 			100
 		);
+		SmallVector<mlir::Value, 8> values;
+		for (size_t i = 0; i < arr.size; i++) {
+			auto value_at_index = codegen(arr.vals[i]);
+			values.push_back(value_at_index);
+		}
 
 		auto alloc = builder.create<mlir::memref::AllocOp>(
 			location,
-			create_memref_type(arr.size, builder.getI32Type())
+			create_memref_type(arr.size, values[0].getType())
 		);
 		// auto * parentBlock = alloc->getBlock();
 
 		for (size_t i = 0; i < arr.size; i++) {
-			SmallVector<mlir::Value, 2> indices;
-			auto value_at_index = codegen(arr.vals[i]);
+			SmallVector<mlir::Value> indices;
 			indices.push_back(
 				builder.create<mlir::arith::ConstantIndexOp>(
 					location, i
@@ -263,7 +295,7 @@ class SCADMIRLowering {
 			);
 			builder.create<mlir::affine::AffineStoreOp>(
 				location,
-				value_at_index,
+				values[i],
 				alloc,
 				llvm::ArrayRef(indices)
 			);
@@ -284,18 +316,13 @@ class SCADMIRLowering {
 		auto index = codegen(fc.params[1]);
 		auto value = codegen(fc.params[2]);
 		SmallVector<mlir::Value, 2> indices;
-		auto index_cnst = builder.create<mlir::arith::IndexCastOp>(
-			location, builder.getIndexType(), index
-		);
-		indices.push_back(index_cnst);
+
+		indices.push_back(index);
 
 		builder.create<mlir::affine::AffineStoreOp>(
-			location,
-			value,
-			array,
-			llvm::ArrayRef(indices)
+			location, value, array, llvm::ArrayRef(indices)
 		);
-		
+
 		return mlir::success();
 	}
 
@@ -318,45 +345,73 @@ class SCADMIRLowering {
 		codegen(*floop.block);
 		builder.setInsertionPointAfter(loop);
 
-
 		codegen(*floop.e2);
 
 		return mlir::success();
 	}
 
 	mlir::LogicalResult scad_parallel(FFIHIRForLoop floop) {
-		mlir::Location location =
-			mlir::FileLineColLoc::get(&context, "parallel", 100, 100);
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, "parallel", 100, 100
+		);
 
 		auto start_point = floop.start.value.integer.value;
 		auto end_point = floop.end.value.integer.value;
 
+		llvm::SmallVector<mlir::Type, 4> types;
+		llvm::ArrayRef<mlir::Attribute> reductions;
+		llvm::SmallVector<mlir::AffineExpr, 4> lbounds = {
+			builder.getAffineDimExpr(0) + start_point
+		};
+		llvm::SmallVector<mlir::AffineExpr, 4> ubounds = {
+			builder.getAffineDimExpr(0) + end_point
+		};
+		SmallVector<int32_t, 4> lboundGroup = { 1 };
+		SmallVector<int32_t, 4> uboundGroup = { 1 };
+		SmallVector<int64_t, 4> steps = { 1 };
+		SmallVector<mlir::Value, 4> operands;
 
-		// llvm::SmallVector<mlir::AffineExpr, 8> lbExprs;
-		// llvm::SmallVector<mlir::AffineExpr, 8> ubExprs;
-		// lbExprs.push_back(builder.getAffineDimExpr(0) + start_point);
-		// ubExprs.push_back(builder.getAffineDimExpr(0) + end_point);
+		operands.push_back(builder.create<mlir::arith::ConstantIndexOp>(
+			location, 0
+		));
 
-		// auto smap = mlir::AffineMap::get(1, 0, lbExprs, builder.getContext());
-		// auto emap = mlir::AffineMap::get(1, 0, ubExprs, builder.getContext());
+		operands.push_back(builder.create<mlir::arith::ConstantIndexOp>(
+			location, 0
+		));
 
-		// llvm::SmallVector<mlir::Value, 8> outerIdxs;
-		// auto loop = builder.create<mlir::affine::AffineParallelOp>(
-		// 	location, smap, outerIdxs, emap, outerIdxs
-		// );
+		auto loop = builder.create<mlir::affine::AffineParallelOp>(
+			location,
+			types,
+			builder.getArrayAttr(reductions),
+			mlir::AffineMapAttr::get(mlir::AffineMap::get(
+				1, 0, lbounds, builder.getContext()
+			)),
+			builder.getI32TensorAttr(lboundGroup),
+			mlir::AffineMapAttr::get(mlir::AffineMap::get(
+				1, 0, ubounds, builder.getContext()
+			)),
+			builder.getI32TensorAttr(uboundGroup),
+			builder.getI64ArrayAttr(steps),
+			operands
+		);
 
+		auto & loop_body = loop.getRegion();
+		auto block = builder.createBlock(&loop_body);
 
+		loop.getBody()->addArgument(builder.getIndexType(), location);
 
-		// builder.setInsertionPointToStart(&loop.getRegion().front());
+		builder.setInsertionPointToStart(block);
 
 		// std::string ivname(floop.iv.data, floop.iv.size);
 		// variables[ivname] = builder.create<mlir::arith::IndexCastOp>(
-		// 	location, builder.getI32Type(), loop.getInductionVar()
+		// 	location, builder.getI32Type(), loop.getIVs()[0]
 		// );
 
-		// codegen(*floop.block);
+		codegen(*floop.block);
 
-		// builder.setInsertionPointAfter(loop);
+		builder.create<mlir::affine::AffineYieldOp>(location);
+
+		builder.setInsertionPointAfter(loop);
 
 		codegen(*floop.e2);
 
@@ -493,12 +548,14 @@ class SCADMIRLowering {
 			return nullptr;
 		} else if (name == "@add") {
 			return scad_add(fc);
-		} else if (name == "@index.i32") {
+		} else if (name.compare(0, 6, "@index") == 0) {
+			// Its an index op
 			return scad_index(fc);
-		} else if (name == "@drop.tensori32") {
+		} else if (name == "@drop") {
 			scad_drop(fc);
 			return nullptr;
-		} else if (name == "@set.i32") {
+		} else if (name.compare(0, 4, "@set") == 0) {
+			// Its a set op
 			scad_set(fc);
 			return nullptr;
 		}
@@ -518,7 +575,7 @@ class SCADMIRLowering {
 		}
 
 		return builder.create<mlir::scad::AddOp>(
-			location, builder.getI32Type(), operands[0], operands[1]
+			location, operands[0].getType(), operands[0], operands[1]
 		);
 	}
 
@@ -536,7 +593,6 @@ class SCADMIRLowering {
 		);
 		SmallVector<mlir::Value, 4> indicies;
 		indicies.push_back(index_cnst);
-
 
 		return builder.create<mlir::affine::AffineLoadOp>(
 			location, array, indicies

@@ -18,3 +18,6 @@ cmake -G Ninja $LLVM_SRC_DIR \
 cmake --build .
 ```
 
+```sh
+llc -filetype=obj -o output.o output.ll
+```

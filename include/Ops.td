@@ -7,6 +7,7 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 
+
 def SCAD_Dialect : Dialect {
   let name = "scad";
   let cppNamespace = "::mlir::scad";
@@ -109,7 +110,7 @@ def ReturnOp : Scad_Op<"return", [Pure, HasParent<"FuncOp">,
   let summary = "return operation";
 
 
-  let arguments = (ins Variadic<AnyTypeOf<[I32MemRef, I32]>>:$input);
+  let arguments = (ins Variadic<AnyTypeOf<[I8MemRef, I8, I16MemRef, I16, I32MemRef, I32, I64MemRef, I64]>>:$input);
 
   let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
 
@@ -173,9 +174,9 @@ def PrintOp : Scad_Op<"print"> {
 def AddOp : Scad_Op<"add",
     [Pure]> {
   let summary = "element-wise addition operation";
-
-  let arguments = (ins I32:$lhs, I32:$rhs);
-  let results = (outs I32);
+  Type AnyInt = AnyTypeOf<[I8, I16, I32, I64]>;
+  let arguments = (ins AnyInt:$lhs, AnyInt:$rhs);
+  let results = (outs AnyInt);
 
   // Indicate that the operation has a custom parser and printer method.
   // let hasCustomAssemblyFormat = 1;

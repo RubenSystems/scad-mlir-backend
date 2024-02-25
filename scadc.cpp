@@ -3,6 +3,7 @@
 #include <passes.h>
 #include <ast.h>
 
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
@@ -14,6 +15,7 @@
 #include "mlir/InitAllDialects.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassRegistry.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -87,11 +89,8 @@ int main(int argc, const char * argv[]) {
 		optPM.addPass(mlir::affine::createAffineScalarReplacementPass()
 		);
 		optPM.addPass(mlir::affine::createLoopUnrollPass());
+		optPM.addPass(mlir::affine::createAffineVectorize());
 		optPM.addPass(mlir::affine::createLoopTilingPass());
-		// optPM.addPass(mlir::affine::createAffineParallelizePass());
-		optPM.addPass(mlir::createCanonicalizerPass());
-		optPM.addPass(mlir::createCSEPass());
-
 	}
 	if (mlir::failed(pm.run(*owned_mod))) {
 		std::cout << "failed to run passes\n";
@@ -101,12 +100,17 @@ int main(int argc, const char * argv[]) {
 	owned_mod->dump();
 	std::cout << "\n\n\n";
 	pm.addPass(mlir::scad::createLowerToLLVMPass());
+	pm.addPass(mlir::createCanonicalizerPass());
+	pm.addPass(mlir::createCSEPass());
+	pm.addPass(mlir::createMem2Reg());
+	pm.addPass(mlir::createRemoveDeadValuesPass());
+
 	pm.addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
 	if (mlir::failed(pm.run(*owned_mod))) {
 		std::cout << "failed to run passes\n";
 		return -1;
 	}
-	owned_mod->dump();
+	// owned_mod->dump();
 
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmPrinter();

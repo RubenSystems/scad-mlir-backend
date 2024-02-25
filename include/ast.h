@@ -29,6 +29,7 @@ extern "C" {
 
 	struct FFIHIRInteger {
 		size_t value;
+		uint32_t width;
 	};
 
 	struct FFIHIRFunctionCall {
