@@ -52,6 +52,11 @@ extern "C" {
 		struct FFIHIRExpr * else_arm;
 	};
 
+	struct FFIHIRCast {
+		struct FFIHIRValue * value; 
+		struct FFIApplication app; 
+	};
+
 	union ValueUnion {
 		struct FFIHIRTensor tensor;
 		struct FFIHIRInteger integer;
@@ -59,6 +64,7 @@ extern "C" {
 		struct FFIHIRFunctionCall function_call;
 		uint8_t boolean;
 		struct FFIHIRConditional conditional;
+		struct FFIHIRCast cast;
 	};
 
 	enum FFIHirValueTag {
@@ -68,6 +74,8 @@ extern "C" {
 		FunctionCall = 3,
 		Bool = 4,
 		Conditional = 5,
+		Float = 6,
+		Cast = 7
 	};
 
 	struct FFIHIRValue {

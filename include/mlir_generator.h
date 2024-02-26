@@ -131,6 +131,8 @@ class SCADMIRLowering {
 		case Conditional:
 			return scad_conditional(value.value.conditional);
 			break;
+		case Cast: 
+			return scad_cast(value.value.cast);
 		default:
 			std::cout
 				<< " " << value.tag
@@ -265,6 +267,18 @@ class SCADMIRLowering {
 				location, attr
 			);
 		}
+	}
+
+	mlir::Value scad_cast(FFIHIRCast i) {
+		mlir::Location location = mlir::FileLineColLoc::get(
+			&context, "Integer literal", 100, 100
+		);
+
+		auto value_to_cast = codegen(*i.value);
+		return builder.create<mlir::arith::IndexCastOp>(
+			location, get_magnitude_type_for(i.app), value_to_cast
+		);
+		
 	}
 
 	mlir::Value scad_vector(FFIHIRTensor arr) {
@@ -588,11 +602,8 @@ class SCADMIRLowering {
 		auto array = codegen(fc.params[0]);
 		auto index = codegen(fc.params[1]);
 
-		auto index_cnst = builder.create<mlir::arith::IndexCastOp>(
-			location, builder.getIndexType(), index
-		);
 		SmallVector<mlir::Value, 4> indicies;
-		indicies.push_back(index_cnst);
+		indicies.push_back(index);
 
 		return builder.create<mlir::affine::AffineLoadOp>(
 			location, array, indicies
