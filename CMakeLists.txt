@@ -85,6 +85,7 @@ target_link_libraries(scadc
 		MLIRAffineTransforms
 		MLIRAffineToStandard
 
+		MLIRSCFToGPU
 		MLIRSCFToOpenMP
 		MLIROpenMPToLLVM
 		MLIROpenMPToLLVMIRTranslation

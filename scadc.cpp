@@ -32,6 +32,7 @@
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Target/LLVMIR/Dialect/OpenMP/OpenMPToLLVMIRTranslation.h"
+#include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
@@ -100,23 +101,33 @@ int main(int argc, const char * argv[]) {
 
 	{
 		mlir::OpPassManager & optPM = pm.nest<mlir::func::FuncOp>();
-		optPM.addPass(mlir::createLowerAffinePass());
+		if (mlir::failed(pm.run(*owned_mod))) {
+			std::cout << "failed to run passes\n";
+			return -1;
+		}
+		owned_mod->dump();
 		optPM.addPass(mlir::createCanonicalizerPass());
 		optPM.addPass(mlir::createCSEPass());
 		optPM.addPass(mlir::affine::createLoopFusionPass());
 		optPM.addPass(mlir::affine::createAffineScalarReplacementPass());
 		optPM.addPass(mlir::affine::createLoopUnrollPass());
 		optPM.addPass(mlir::affine::createAffineVectorize());
+		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass());
+		if (mlir::failed(pm.run(*owned_mod))) {
+			std::cout << "failed to run passes\n";
+			return -1;
+		}
+		owned_mod->dump();
+		optPM.addPass(mlir::createLowerAffinePass());
 	}
 
+	// rubenticehurst-james@rubens-mbp-2 build % ./bin/mlir-opt -affine-loop-unroll -convert-arith-to-arm-sme -affine-scalrep -topological-sort -lower-affine -scf-for-loop-peeling -scf-for-loop-range-folding -scf-for-loop-specialization -scf-for-to-while -convert-to-llvm -convert-index-to-llvm -reconcile-unrealized-casts test2.mlir
 
-	if (mlir::failed(pm.run(*owned_mod))) {
-		std::cout << "failed to run passes\n";
-		return -1;
-	}
+	
 	std::cout << "\n\n\n";
 	owned_mod->dump();
 	std::cout << "\n\n\n";
+
 	pm.addPass(mlir::createConvertSCFToOpenMPPass());
     // pm.addPass(mlir::createConvertFuncToLLVMPass());
     // pm.addPass(mlir::createConvertMemRefToLLVMConversionPass());
