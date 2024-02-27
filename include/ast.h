@@ -88,6 +88,7 @@ extern "C" {
 		struct FFIHIRValue start;
 		struct FFIHIRValue end;
 		const struct FFIHIRExpr * block;
+		bool parallel;
 		const struct FFIHIRExpr * e2;
 	};
 

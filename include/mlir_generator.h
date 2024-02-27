@@ -101,7 +101,11 @@ class SCADMIRLowering {
 			scad_func_prototype(expression.value.forward_func_decl);
 			break;
 		case For:
-			scad_parallel(expression.value.floop);
+			if (expression.value.floop.parallel) {
+				scad_parallel(expression.value.floop);
+			} else {
+				scad_for(expression.value.floop);
+			}
 			break;
 		default:
 			std::cout
@@ -245,6 +249,8 @@ class SCADMIRLowering {
 			return builder.getI64Type();
 		case 1000:
 			return builder.getIndexType();
+		default: 
+			std::cout << "FAILURE GET TYPE FOR WIDTH" << std::endl;
 		}
 	}
 
@@ -350,7 +356,9 @@ class SCADMIRLowering {
 			location, start_point, end_point, 1
 		);
 		std::string ivname(floop.iv.data, floop.iv.size);
-		variables[ivname] =  loop.getInductionVar();
+		variables[ivname] = loop.getInductionVar();
+
+		std::cout << ivname << "--!" << std::endl;
 
 		builder.setInsertionPointToStart(&loop.getRegion().front());
 		codegen(*floop.block);
@@ -410,6 +418,10 @@ class SCADMIRLowering {
 		auto block = builder.createBlock(&loop_body);
 
 		loop.getBody()->addArgument(builder.getIndexType(), location);
+
+
+		std::string ivname(floop.iv.data, floop.iv.size);
+		variables[ivname] = loop.getIVs()[0];
 
 		builder.setInsertionPointToStart(block);
 

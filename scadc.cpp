@@ -101,16 +101,12 @@ int main(int argc, const char * argv[]) {
 	{
 		mlir::OpPassManager & optPM = pm.nest<mlir::func::FuncOp>();
 		optPM.addPass(mlir::createLowerAffinePass());
-		// -affine-loop-unroll  -affine-super-vectorize -affine-parallelize -affine-expand-index-ops
-		// optPM.addPass(mlir::createCanonicalizerPass());
-		// optPM.addPass(mlir::createCSEPass());
-		// 	optPM.addPass(mlir::affine::createAffineParallelizePass());
-		// 	optPM.addPass(mlir::affine::createLoopFusionPass());
-		// 	optPM.addPass(mlir::affine::createAffineScalarReplacementPass());
-
-
-		// 	// optPM.addPass(mlir::affine::createLoopUnrollPass());
-		// 	// optPM.addPass(mlir::affine::createAffineVectorize());
+		optPM.addPass(mlir::createCanonicalizerPass());
+		optPM.addPass(mlir::createCSEPass());
+		optPM.addPass(mlir::affine::createLoopFusionPass());
+		optPM.addPass(mlir::affine::createAffineScalarReplacementPass());
+		optPM.addPass(mlir::affine::createLoopUnrollPass());
+		optPM.addPass(mlir::affine::createAffineVectorize());
 	}
 
 
@@ -166,17 +162,27 @@ int main(int argc, const char * argv[]) {
 		/*sizeLevel=*/0,
 		/*targetMachine=*/nullptr
 	);
+	if (auto err = optPipeline(llvmModule.get())) {
+		llvm::errs() << "Failed to optimize LLVM IR " << err << "\n";
+		return -1;
+	}
 
 	std::error_code ec;
-	llvm::raw_fd_ostream dest("output.ll", ec, llvm::sys::fs::OF_None);
-	dest << *llvmModule;
+	llvm::raw_fd_ostream ll_dest("output.ll", ec, llvm::sys::fs::OF_None);
+	ll_dest << *llvmModule;
 	llvm::errs() << *llvmModule << "\n";
+
+
+
+
+
 	// llvm::errs() << "\n\n====EXECUTING====\n\n";
 	// mlir::ExecutionEngineOptions engineOptions;
 	// engineOptions.transformer = optPipeline;
 	// auto maybeEngine = mlir::ExecutionEngine::create(mod, engineOptions);
 	// assert(maybeEngine && "failed to construct an execution engine");
 	// auto & engine = maybeEngine.get();
+	// engine->dumpToObjectFile("output.o");
 
 	// // Invoke the JIT-compiled function.
 	// auto invocationResult = engine->invokePacked("main");
