@@ -101,7 +101,7 @@ class SCADMIRLowering {
 			scad_func_prototype(expression.value.forward_func_decl);
 			break;
 		case For:
-			scad_for(expression.value.floop);
+			scad_parallel(expression.value.floop);
 			break;
 		default:
 			std::cout
@@ -148,7 +148,6 @@ class SCADMIRLowering {
 
 	// Messages to passdown funtions
 	bool is_generating_main = false;
-	bool should_force_index_type = false;
 
 	void * type_query_engine;
 
@@ -350,12 +349,10 @@ class SCADMIRLowering {
 		auto loop = builder.create<mlir::affine::AffineForOp>(
 			location, start_point, end_point, 1
 		);
-		builder.setInsertionPointToStart(&loop.getRegion().front());
-
 		std::string ivname(floop.iv.data, floop.iv.size);
-		variables[ivname] = builder.create<mlir::arith::IndexCastOp>(
-			location, builder.getI32Type(), loop.getInductionVar()
-		);
+		variables[ivname] =  loop.getInductionVar();
+
+		builder.setInsertionPointToStart(&loop.getRegion().front());
 		codegen(*floop.block);
 		builder.setInsertionPointAfter(loop);
 
@@ -416,13 +413,7 @@ class SCADMIRLowering {
 
 		builder.setInsertionPointToStart(block);
 
-		// std::string ivname(floop.iv.data, floop.iv.size);
-		// variables[ivname] = builder.create<mlir::arith::IndexCastOp>(
-		// 	location, builder.getI32Type(), loop.getIVs()[0]
-		// );
-
 		codegen(*floop.block);
-
 		builder.create<mlir::affine::AffineYieldOp>(location);
 
 		builder.setInsertionPointAfter(loop);
@@ -434,8 +425,7 @@ class SCADMIRLowering {
 
 	mlir::Value scad_constant(FFIHIRVariableDecl decl) {
 		std::string name(decl.name.data, decl.name.size);
-		mlir::Location location =
-			mlir::FileLineColLoc::get(&context, name, 100, 100);
+
 		// auto r = builder.create<mlir::scad::VectorOp>(
 		// 	location, scad_matrix(decl.e1.value.array)
 		// );

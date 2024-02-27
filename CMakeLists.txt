@@ -81,4 +81,13 @@ target_link_libraries(scadc
 		MLIRSupport
 		MLIRTargetLLVMIRExport
 		MLIRTransforms
+		MLIRAffineDialect
+		MLIRAffineTransforms
+		MLIRAffineToStandard
+
+		MLIRSCFToOpenMP
+		MLIROpenMPToLLVM
+		MLIROpenMPToLLVMIRTranslation
+
+
 )

@@ -199,18 +199,7 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 			// Assumes funcitons have more then one restype
 			auto res_type =
 				adaptor.getFunctionType().getResults()[0];
-
-			// SmallVector<mlir::Type, 4> lowered_operands;
-			// for (auto & input_type :
-			//      op.getFunctionType().getInputs()) {
-			// 	auto param_type =
-			// 		llvm::cast<RankedTensorType>(input_type
-			// 		);
-			// 	lowered_operands.push_back(
-
-			// 	);
-			// }
-
+				
 			auto function_type = rewriter.getFunctionType(
 				op.getFunctionType().getInputs(), res_type
 			);
