@@ -147,6 +147,26 @@ extern "C" {
 
 // functionality
 extern "C" {
-	struct FFIHIRExpr compile(const char *, void **);
+// 	union ProgramOut {
+//     pub program: std::mem::ManuallyDrop<FFIHIRExpr>,
+//     pub error: u32,
+// }
+
+// pub struct OutData {
+//     pub compiled: bool,
+//     pub program: ProgramOut,
+// }
+
+	union ProgramOut {
+		struct FFIHIRExpr prog;
+		uint32_t err ;
+	};
+
+	struct OutData {
+		bool compiled; 
+		union ProgramOut program;
+	};
+
+	struct OutData compile(const char *, void **);
 	struct FFIType query(void *, const char *);
 }
