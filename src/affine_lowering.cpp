@@ -15,6 +15,9 @@
 #include "mlir/IR/IntegerSet.h"
 #include "passes.h"
 
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -396,6 +399,8 @@ void SCADToAffineLoweringPass::runOnOperation() {
 		BuiltinDialect,
 		arith::ArithDialect,
 		func::FuncDialect,
+		mlir::vector::VectorDialect,
+		mlir::arm_sve::ArmSVEDialect,
 		memref::MemRefDialect>();
 
 	target.addDynamicallyLegalOp<scad::PrintOp>([](scad::PrintOp op) {
