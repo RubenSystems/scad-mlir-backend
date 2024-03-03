@@ -1,5 +1,5 @@
 fn add(a: 100000xi32, b: 100000xi32, result: 100000xi32) i32 {
-	parallel i: 0 -> 100000 {
+	for i: 0 -> 100000 {
 		for j: 0 -> 100000 {
 			let mut a_b: i32 = @add(a: @index.i32(c: a, idx: j), b: @index.i32(c: b, idx: j));
 			@set.i32(container: result, idx: j, res: a_b);

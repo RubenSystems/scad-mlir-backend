@@ -80,7 +80,7 @@ struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 			// Assumes funcitons have more then one restype
 			auto res_type =
 				adaptor.getFunctionType().getResults()[0];
-				
+
 			auto function_type = rewriter.getFunctionType(
 				op.getFunctionType().getInputs(), res_type
 			);

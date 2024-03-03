@@ -51,6 +51,7 @@ add_llvm_executable(scadc
 	src/Dialect.cpp
 	src/affine_lowering.cpp
 	src/llvm_lowering.cpp
+	src/mlir_generator.cpp
 DEPENDS
 	ScadOpsIncGen
 )

@@ -53,8 +53,8 @@ extern "C" {
 	};
 
 	struct FFIHIRCast {
-		struct FFIHIRValue * value; 
-		struct FFIApplication app; 
+		struct FFIHIRValue * value;
+		struct FFIApplication app;
 	};
 
 	union ValueUnion {

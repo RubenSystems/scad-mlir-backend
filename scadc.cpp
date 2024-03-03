@@ -40,6 +40,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Conversion/Passes.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
@@ -59,8 +60,6 @@ int main(int argc, const char * argv[]) {
 
 	void * query_engine = nullptr;
 	FFIHIRExpr x = compile(argv[1], &query_engine);
-
-
 
 	mlir::DialectRegistry registry;
 	mlir::func::registerAllExtensions(registry);
@@ -102,28 +101,26 @@ int main(int argc, const char * argv[]) {
 		mlir::OpPassManager & optPM = pm.nest<mlir::scad::FuncOp>();
 		optPM.addPass(mlir::createCanonicalizerPass());
 		optPM.addPass(mlir::createCSEPass());
-
-
 	}
 
 	pm.addPass(mlir::scad::createLowerToAffinePass());
-
 
 	{
 		mlir::OpPassManager & optPM = pm.nest<mlir::func::FuncOp>();
 		optPM.addPass(mlir::createCanonicalizerPass());
 		optPM.addPass(mlir::createCSEPass());
 		optPM.addPass(mlir::affine::createLoopFusionPass());
-		optPM.addPass(mlir::affine::createAffineScalarReplacementPass());
+		optPM.addPass(mlir::affine::createAffineScalarReplacementPass()
+		);
 		// optPM.addPass(mlir::affine::createLoopUnrollPass());
 		optPM.addPass(mlir::affine::createAffineVectorize());
-		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass());
+		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass()
+		);
 		optPM.addPass(mlir::createLowerAffinePass());
 	}
 
 	// rubenticehurst-james@rubens-mbp-2 build % ./bin/mlir-opt -affine-loop-unroll -convert-arith-to-arm-sme -affine-scalrep -topological-sort -lower-affine -scf-for-loop-peeling -scf-for-loop-range-folding -scf-for-loop-specialization -scf-for-to-while -convert-to-llvm -convert-index-to-llvm -reconcile-unrealized-casts test2.mlir
 
-	
 	std::cout << "\n\n\n";
 
 	if (mlir::failed(pm.run(*owned_mod))) {
@@ -132,23 +129,25 @@ int main(int argc, const char * argv[]) {
 	}
 	owned_mod->dump();
 	std::cout << "\n\n\nnewmod:" << std::endl;
-	pm.addPass(mlir::createConvertLinalgToLoopsPass());
+	// pm.addPass(mlir::createConvertLinalgToLoopsPass());
+	pm.addPass(mlir::createArithToLLVMConversionPass());
 	pm.addPass(mlir::createConvertSCFToOpenMPPass());
-    pm.addPass(mlir::createConvertSCFToCFPass());
+	pm.addPass(mlir::createConvertSCFToCFPass());
 
 	pm.addPass(mlir::memref::createExpandOpsPass());
-    pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
-    pm.addPass(mlir::createConvertFuncToLLVMPass());
+	pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
+	pm.addPass(mlir::createConvertVectorToLLVMPass());
+	pm.addPass(mlir::createConvertFuncToLLVMPass());
 
-    pm.addPass(mlir::createConvertControlFlowToLLVMPass());
-    // pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+	pm.addPass(mlir::createConvertControlFlowToLLVMPass());
+	// pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+	//  -convert-scf-to-cf -memref-expand -finalize-memref-to-llvm -convert-vector-to-llvm -convert-func-to-llvm -convert-cf-to-llvm -reconcile-unrealized-casts
 
 	// if (mlir::failed(pm.run(*owned_mod))) {
 	// 	std::cout << "failed to run passes\n";
 	// 	return -1;
 	// }
 	// owned_mod->dump();
-    // pm.addPass(mlir::createConvertIndexToLLVMPass());
 	// pm.addPass(mlir::createConvertMathToLLVMPass());
 
 	// 	if (mlir::failed(pm.run(*owned_mod))) {
@@ -172,16 +171,16 @@ int main(int argc, const char * argv[]) {
 	// 	return -1;
 	// }
 	// owned_mod->dump();
-		if (mlir::failed(pm.run(*owned_mod))) {
+	if (mlir::failed(pm.run(*owned_mod))) {
 		std::cout << "failed to run passes\n";
 		return -1;
 	}
 	owned_mod->dump();
-    // pm.addPass(mlir::memref::createExpandStridedMetadataPass());
+	// pm.addPass(mlir::memref::createExpandStridedMetadataPass());
 
-    // pm.addPass(mlir::createConvertMathToLLVMPass());
+	// pm.addPass(mlir::createConvertMathToLLVMPass());
 
-    // pm.addPass(mlir::createConvertMathToLibmPass());
+	// pm.addPass(mlir::createConvertMathToLibmPass());
 
 	pm.addPass(mlir::createCanonicalizerPass());
 	pm.addPass(mlir::createCSEPass());
@@ -208,7 +207,6 @@ int main(int argc, const char * argv[]) {
 		return -1;
 	}
 
-
 	auto optPipeline = mlir::makeOptimizingTransformer(
 		/*optLevel=*/3,
 		/*sizeLevel=*/0,
@@ -223,10 +221,6 @@ int main(int argc, const char * argv[]) {
 	llvm::raw_fd_ostream ll_dest("output.ll", ec, llvm::sys::fs::OF_None);
 	ll_dest << *llvmModule;
 	llvm::errs() << *llvmModule << "\n";
-
-
-
-
 
 	// llvm::errs() << "\n\n====EXECUTING====\n\n";
 	// mlir::ExecutionEngineOptions engineOptions;
@@ -300,8 +294,6 @@ int main(int argc, const char * argv[]) {
 // 	void * query_engine = nullptr;
 // 	FFIHIRExpr x = compile(argv[1], &query_engine);
 
-
-
 // 	mlir::DialectRegistry registry;
 // 	mlir::func::registerAllExtensions(registry);
 
@@ -343,11 +335,9 @@ int main(int argc, const char * argv[]) {
 // 		optPM.addPass(mlir::createCanonicalizerPass());
 // 		optPM.addPass(mlir::createCSEPass());
 
-
 // 	}
 
 // 	pm.addPass(mlir::scad::createLowerToAffinePass());
-
 
 // 	{
 // 		mlir::OpPassManager & optPM = pm.nest<mlir::func::FuncOp>();
@@ -373,7 +363,6 @@ int main(int argc, const char * argv[]) {
 
 // 	// ./bin/mlir-opt -affine-loop-unroll -convert-arith-to-arm-sme -affine-scalrep -topological-sort -lower-affine -scf-for-loop-peeling -scf-for-loop-range-folding -scf-for-loop-specialization -scf-for-to-while -convert-to-llvm -convert-index-to-llvm -reconcile-unrealized-casts test2.mlir
 
-	
 // 	std::cout << "\n\n\n";
 // 	owned_mod->dump();
 // 	std::cout << "\n\n\n";
@@ -422,7 +411,6 @@ int main(int argc, const char * argv[]) {
 // 		return -1;
 // 	}
 
-
 // 	auto optPipeline = mlir::makeOptimizingTransformer(
 // 		/*optLevel=*/3,
 // 		/*sizeLevel=*/0,
@@ -437,10 +425,6 @@ int main(int argc, const char * argv[]) {
 // 	llvm::raw_fd_ostream ll_dest("output.ll", ec, llvm::sys::fs::OF_None);
 // 	ll_dest << *llvmModule;
 // 	llvm::errs() << *llvmModule << "\n";
-
-
-
-
 
 // 	// llvm::errs() << "\n\n====EXECUTING====\n\n";
 // 	// mlir::ExecutionEngineOptions engineOptions;
