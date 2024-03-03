@@ -573,20 +573,11 @@ class SCADMIRLowering {
 			operands.push_back(arg);
 		}
 
-		return builder.create<mlir::scad::AddOp>(
+		return builder.create<mlir::arith::AddIOp>(
 			location, operands[0].getType(), operands[0], operands[1]
 		);
 	}
 
-	/*
-		operands: 
-			- range start
-			- range end 
-			- source a
-			- source b
-			- result
-	
-	*/ 
 	mlir::LogicalResult scad_vectorised_add(FFIHIRFunctionCall fc) {
 		mlir::Location location =
 			mlir::FileLineColLoc::get(&context, "vectorised add op", 100, 100);
@@ -601,8 +592,8 @@ class SCADMIRLowering {
 		}
 
 
-		llvm::SmallVector<mlir::Value, 4> input_operands = {operands[2], operands[3]};
-		llvm::SmallVector<mlir::Value, 4> output_operands = {operands[4]};
+		llvm::SmallVector<mlir::Value, 4> input_operands = {operands[0], operands[1]};
+		llvm::SmallVector<mlir::Value, 4> output_operands = {operands[2]};
 		auto res = builder.create<mlir::linalg::AddOp>(
 			location, input_operands, output_operands
 		);
