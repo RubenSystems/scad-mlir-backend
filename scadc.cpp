@@ -120,6 +120,11 @@ int main(int argc, const char * argv[]) {
 	}
 
 	pm.addPass(mlir::scad::createLowerToAffinePass());
+	if (mlir::failed(pm.run(*owned_mod))) {
+		std::cout << "failed lower from affine\n";
+		return -1;
+	}
+	owned_mod->dump();
 
 	{
 		mlir::OpPassManager & optPM = pm.nest<mlir::func::FuncOp>();
@@ -141,7 +146,7 @@ int main(int argc, const char * argv[]) {
 	std::cout << "\n\n\n";
 
 	if (mlir::failed(pm.run(*owned_mod))) {
-		std::cout << "failed to run passes\n";
+		std::cout << "failed lower from affine\n";
 		return -1;
 	}
 	owned_mod->dump();
@@ -159,7 +164,7 @@ int main(int argc, const char * argv[]) {
 	pm.addPass(mlir::createConvertControlFlowToLLVMPass());
 
 	if (mlir::failed(pm.run(*owned_mod))) {
-		std::cout << "failed to run passes\n";
+		std::cout << "failed to lower to llvm\n";
 		return -1;
 	}
 	owned_mod->dump();
@@ -172,7 +177,7 @@ int main(int argc, const char * argv[]) {
 	pm.addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
 	pm.addPass(mlir::createCSEPass());
 	if (mlir::failed(pm.run(*owned_mod))) {
-		std::cout << "failed to run passes\n";
+		std::cout << "failed to clean llvm\n";
 		return -1;
 	}
 	owned_mod->dump();

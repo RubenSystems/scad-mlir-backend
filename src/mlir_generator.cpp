@@ -489,23 +489,51 @@ mlir::Value SCADMIRLowering::scad_vector_load_op(FFIHIRFunctionCall fc) {
 		operands.push_back(arg);
 	}
 
+
 	auto size = llvm::cast<mlir::arith::ConstantIndexOp>(operands[2].getDefiningOp());
-	auto offset = llvm::cast<mlir::arith::ConstantIndexOp>(operands[1].getDefiningOp());
+	llvm::SmallVector<mlir::Value> load_ops = {
+		operands[1]
+	};
+	llvm::SmallVector<mlir::Type> res_type = {
+		mlir::VectorType::get(
+			{16},
+			llvm::cast<mlir::MemRefType>(operands[0].getType())
+				.getElementType()
+		)
 
-	llvm::SmallVector<mlir::Value> load_ops = {offset};
-	auto load_map = mlir::AffineMap::get(
-		1, 0, { builder.getAffineDimExpr(0) + offset.value() }, builder.getContext()
-	);
+	};
 
-	auto type = mlir::VectorType::get(
-		{size.value()},
-		llvm::cast<mlir::MemRefType>(operands[0].getType())
-			.getElementType()
-	);
+	return builder.create<mlir::vector::LoadOp>(mlir::UnknownLoc::get(&context), res_type, operands[0], load_ops);
 
-	return builder.create<mlir::affine::AffineVectorLoadOp>(
-		mlir::UnknownLoc::get(&context), type, operands[0], load_ops, load_map
-	);
+
+	// auto offset = llvm::cast<mlir::arith::ConstantIndexOp>(operands[1].getDefiningOp());
+
+	// auto size = builder.create<mlir::arith::IndexCastOp>(
+	// 	location, builder.getIndexType(), operands[2]
+	// );
+
+	// auto offset = builder.create<mlir::arith::IndexCastOp>(
+	// 	mlir::UnknownLoc::get(&context), builder.getIndexType(), 
+	// );
+
+
+	// llvm::SmallVector<mlir::Value> load_ops = {
+	// 	builder.create<mlir::arith::ConstantIndexOp>(mlir::UnknownLoc::get(&context), 0), 
+	// 	operands[1]
+	// };
+	// auto load_map = mlir::AffineMap::get(
+	// 	1, 1,  builder.getAffineDimExpr(0) + builder.getAffineSymbolExpr(0)
+	// );
+
+	// auto type = mlir::VectorType::get(
+	// 	{size.value()},
+	// 	llvm::cast<mlir::MemRefType>(operands[0].getType())
+	// 		.getElementType()
+	// );
+
+	// return builder.create<mlir::affine::AffineVectorLoadOp>(
+	// 	mlir::UnknownLoc::get(&context), type, operands[0], load_ops, load_map
+	// );
 }
 
 mlir::LogicalResult SCADMIRLowering::scad_vector_store_op(FFIHIRFunctionCall fc) {
