@@ -147,23 +147,23 @@ extern "C" {
 
 // functionality
 extern "C" {
-// 	union ProgramOut {
-//     pub program: std::mem::ManuallyDrop<FFIHIRExpr>,
-//     pub error: u32,
-// }
+	// 	union ProgramOut {
+	//     pub program: std::mem::ManuallyDrop<FFIHIRExpr>,
+	//     pub error: u32,
+	// }
 
-// pub struct OutData {
-//     pub compiled: bool,
-//     pub program: ProgramOut,
-// }
+	// pub struct OutData {
+	//     pub compiled: bool,
+	//     pub program: ProgramOut,
+	// }
 
 	union ProgramOut {
 		struct FFIHIRExpr prog;
-		uint32_t err ;
+		uint32_t err;
 	};
 
 	struct OutData {
-		bool compiled; 
+		bool compiled;
 		union ProgramOut program;
 	};
 

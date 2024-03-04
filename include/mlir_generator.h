@@ -113,7 +113,6 @@ class SCADMIRLowering {
 
 	std::vector<int64_t> get_dims_for(FFIApplication t);
 
-
 	mlir::LogicalResult declare(std::string var, mlir::Value value);
 
 	mlir::MemRefType

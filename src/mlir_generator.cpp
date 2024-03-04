@@ -103,7 +103,8 @@ std::vector<int64_t> SCADMIRLowering::get_dims_for(FFIApplication t) {
 	return dims;
 }
 
-mlir::LogicalResult SCADMIRLowering::declare(std::string var, mlir::Value value) {
+mlir::LogicalResult
+SCADMIRLowering::declare(std::string var, mlir::Value value) {
 	if (variables.find(var) != variables.end()) {
 		return mlir::failure();
 	}
@@ -111,8 +112,10 @@ mlir::LogicalResult SCADMIRLowering::declare(std::string var, mlir::Value value)
 	return mlir::success();
 }
 
-mlir::MemRefType
-SCADMIRLowering::create_memref_type(mlir::ArrayRef<int64_t> shape, mlir::Type type) {
+mlir::MemRefType SCADMIRLowering::create_memref_type(
+	mlir::ArrayRef<int64_t> shape,
+	mlir::Type type
+) {
 	return mlir::MemRefType::get(shape, type);
 }
 
@@ -420,7 +423,8 @@ void SCADMIRLowering::scad_func_prototype(FFIHIRForwardFunctionDecl ffd) {
 	codegen(*ffd.e2);
 }
 
-mlir::Value SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
+mlir::Value
+SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 	if (name == "@print") {
 		scad_print(fc);
 		return nullptr;
@@ -487,7 +491,11 @@ mlir::LogicalResult SCADMIRLowering::scad_vectorised_op(FFIHIRFunctionCall fc) {
 		operands.push_back(arg);
 	}
 
-	auto type = mlir::VectorType::get({ 100000 }, builder.getI32Type());
+	auto type = mlir::VectorType::get(
+		llvm::cast<mlir::MemRefType>(operands[0].getType()).getShape(),
+		llvm::cast<mlir::MemRefType>(operands[0].getType())
+			.getElementType()
+	);
 	auto load_map = mlir::AffineMap::get(
 		1, 0, { builder.getAffineDimExpr(0) }, builder.getContext()
 	);
@@ -525,7 +533,8 @@ mlir::Value SCADMIRLowering::scad_index(FFIHIRFunctionCall fc) {
 	);
 }
 
-mlir::scad::FuncOp SCADMIRLowering::proto_gen(FFIHIRFunctionDecl ffd, FFIType function_type) {
+mlir::scad::FuncOp
+SCADMIRLowering::proto_gen(FFIHIRFunctionDecl ffd, FFIType function_type) {
 	std::string name = std::string(ffd.name.data, ffd.name.size);
 	mlir::Location location =
 		mlir::FileLineColLoc::get(&context, name + "PROTO", 100, 100);

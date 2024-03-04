@@ -60,8 +60,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 
-
-
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -73,7 +71,7 @@ int main(int argc, const char * argv[]) {
 	mlir::registerPassManagerCLOptions();
 
 	void * query_engine = nullptr;
-	auto res =  compile(argv[1], &query_engine);
+	auto res = compile(argv[1], &query_engine);
 	if (res.compiled == false) {
 		return -1;
 	}
@@ -162,7 +160,6 @@ int main(int argc, const char * argv[]) {
 	}
 	owned_mod->dump();
 
-
 	pm.addPass(mlir::createCanonicalizerPass());
 	pm.addPass(mlir::createCSEPass());
 	pm.addPass(mlir::createMem2Reg());
@@ -203,7 +200,11 @@ int main(int argc, const char * argv[]) {
 	ll_dest << *llvmModule;
 	llvm::errs() << *llvmModule << "\n";
 
-	std::string command = std::string("llc -filetype=obj -o ") + argv[2] + std::string(" tmp.ll; rm tmp.ll");
+	std::string command =
+		std::string(
+			"~/downloads/llvm-project/cbld/bin/llc -filetype=obj -o "
+		) +
+		argv[2] + std::string(" tmp.ll; rm tmp.ll");
 	int result = system(command.data());
 
 	return 0;
