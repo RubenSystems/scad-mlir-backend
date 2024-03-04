@@ -24,6 +24,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Support/LogicalResult.h"
 
+#include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Conversion/LinalgToStandard/LinalgToStandard.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -127,13 +128,15 @@ int main(int argc, const char * argv[]) {
 		optPM.addPass(mlir::affine::createLoopFusionPass());
 		optPM.addPass(mlir::affine::createAffineScalarReplacementPass()
 		);
+		optPM.addPass(mlir::affine::createLoopUnrollPass());
+		// optPM.addPass(mlir::affine::createLoopTilingPass());
+		
 		optPM.addPass(mlir::affine::createAffineVectorize());
 		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass()
 		);
 		optPM.addPass(mlir::createLowerAffinePass());
-	}
 
-	// rubenticehurst-james@rubens-mbp-2 build % ./bin/mlir-opt -affine-loop-unroll -convert-arith-to-arm-sme -affine-scalrep -topological-sort -lower-affine -scf-for-loop-peeling -scf-for-loop-range-folding -scf-for-loop-specialization -scf-for-to-while -convert-to-llvm -convert-index-to-llvm -reconcile-unrealized-casts test2.mlir
+	}
 
 	std::cout << "\n\n\n";
 
@@ -143,7 +146,8 @@ int main(int argc, const char * argv[]) {
 	}
 	owned_mod->dump();
 	std::cout << "\n\n\nnewmod:" << std::endl;
-	// pm.addPass(mlir::createConvertLinalgToLoopsPass());
+	pm.addPass(mlir::createForLoopPeelingPass());
+	pm.addPass(mlir::createInlinerPass());
 	pm.addPass(mlir::createArithToLLVMConversionPass());
 	pm.addPass(mlir::createConvertSCFToOpenMPPass());
 	pm.addPass(mlir::createConvertSCFToCFPass());
@@ -166,6 +170,7 @@ int main(int argc, const char * argv[]) {
 	pm.addPass(mlir::createRemoveDeadValuesPass());
 	pm.addPass(mlir::scad::createLowerToLLVMPass());
 	pm.addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
+	pm.addPass(mlir::createCSEPass());
 	if (mlir::failed(pm.run(*owned_mod))) {
 		std::cout << "failed to run passes\n";
 		return -1;

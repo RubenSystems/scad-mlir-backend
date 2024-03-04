@@ -149,8 +149,11 @@ class SCADMIRLowering {
 	template <typename Operation>
 	mlir::Value scad_scalar_op(FFIHIRFunctionCall fc);
 
+	mlir::Value scad_vector_load_op(FFIHIRFunctionCall fc);
+	mlir::LogicalResult scad_vector_store_op(FFIHIRFunctionCall fc);
+
 	template <typename Operation>
-	mlir::LogicalResult scad_vectorised_op(FFIHIRFunctionCall fc);
+	mlir::Value scad_vectorised_op(FFIHIRFunctionCall fc);
 
 	mlir::Value scad_index(FFIHIRFunctionCall fc);
 

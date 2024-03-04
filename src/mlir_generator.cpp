@@ -435,15 +435,17 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 	} else if (name == "@mul") {
 		return scad_scalar_op<mlir::arith::MulIOp>(fc);
 	} else if (name == "@add.v") {
-		scad_vectorised_op<mlir::arith::AddIOp>(fc);
-		return nullptr;
+		return scad_vectorised_op<mlir::arith::AddIOp>(fc);
 	} else if (name == "@sub.v") {
-		scad_vectorised_op<mlir::arith::SubIOp>(fc);
-		return nullptr;
+		return scad_vectorised_op<mlir::arith::SubIOp>(fc);
 	} else if (name == "@mul.v") {
-		scad_vectorised_op<mlir::arith::MulIOp>(fc);
+		return scad_vectorised_op<mlir::arith::MulIOp>(fc);
+	} else if (name == "@vec.store") {
+		scad_vector_store_op(fc);
 		return nullptr;
-	} else if (name.compare(0, 6, "@index") == 0) {
+	} else if (name == "@vec.load") {
+		return scad_vector_load_op(fc);
+	}else if (name.compare(0, 6, "@index") == 0) {
 		// Its an index op
 		return scad_index(fc);
 	} else if (name == "@drop") {
@@ -475,8 +477,56 @@ mlir::Value SCADMIRLowering::scad_scalar_op(FFIHIRFunctionCall fc) {
 	);
 }
 
+
+mlir::Value SCADMIRLowering::scad_vector_load_op(FFIHIRFunctionCall fc) {
+	SmallVector<mlir::Value, 4> operands;
+	for (size_t i = 0; i < fc.param_len; i++) {
+		auto arg = codegen(fc.params[i]);
+		if (!arg) {
+			std::cout
+				<< "failed to parse arg in scad vectorised add";
+		}
+		operands.push_back(arg);
+	}
+
+	auto size = llvm::cast<mlir::arith::ConstantIndexOp>(operands[2].getDefiningOp());
+	auto offset = llvm::cast<mlir::arith::ConstantIndexOp>(operands[1].getDefiningOp());
+
+	llvm::SmallVector<mlir::Value> load_ops = {offset};
+	auto load_map = mlir::AffineMap::get(
+		1, 0, { builder.getAffineDimExpr(0) + offset.value() }, builder.getContext()
+	);
+
+	auto type = mlir::VectorType::get(
+		{size.value()},
+		llvm::cast<mlir::MemRefType>(operands[0].getType())
+			.getElementType()
+	);
+
+	return builder.create<mlir::affine::AffineVectorLoadOp>(
+		mlir::UnknownLoc::get(&context), type, operands[0], load_ops, load_map
+	);
+}
+
+mlir::LogicalResult SCADMIRLowering::scad_vector_store_op(FFIHIRFunctionCall fc) {
+	SmallVector<mlir::Value, 4> operands;
+	for (size_t i = 0; i < fc.param_len; i++) {
+		auto arg = codegen(fc.params[i]);
+		if (!arg) {
+			std::cout
+				<< "failed to parse arg in scad vectorised add";
+		}
+		operands.push_back(arg);
+	}
+
+	builder.create<mlir::affine::AffineVectorStoreOp>(
+		mlir::UnknownLoc::get(&context), operands[1]/*memref to store to*/, operands[0]/*vec to laod from*/, operands[2]/*Offset*/
+	);
+	return mlir::success();
+}
+
 template <typename Operation>
-mlir::LogicalResult SCADMIRLowering::scad_vectorised_op(FFIHIRFunctionCall fc) {
+mlir::Value SCADMIRLowering::scad_vectorised_op(FFIHIRFunctionCall fc) {
 	mlir::Location location = mlir::FileLineColLoc::get(
 		&context, "vectorised add op", 100, 100
 	);
@@ -491,30 +541,9 @@ mlir::LogicalResult SCADMIRLowering::scad_vectorised_op(FFIHIRFunctionCall fc) {
 		operands.push_back(arg);
 	}
 
-	auto type = mlir::VectorType::get(
-		llvm::cast<mlir::MemRefType>(operands[0].getType()).getShape(),
-		llvm::cast<mlir::MemRefType>(operands[0].getType())
-			.getElementType()
-	);
-	auto load_map = mlir::AffineMap::get(
-		1, 0, { builder.getAffineDimExpr(0) }, builder.getContext()
-	);
-	llvm::SmallVector<mlir::Value> load_ops = {
-		builder.create<mlir::arith::ConstantIndexOp>(location, 0)
-	};
-	auto op_one = builder.create<mlir::affine::AffineVectorLoadOp>(
-		location, type, operands[0], load_ops, load_map
-	);
-	auto op_two = builder.create<mlir::affine::AffineVectorLoadOp>(
-		location, type, operands[1], load_ops, load_map
-	);
+	auto type = operands[0].getType();
 
-	auto res = builder.create<Operation>(location, type, op_one, op_two);
-	builder.create<mlir::affine::AffineVectorStoreOp>(
-		location, res, operands[2], load_ops
-	);
-
-	return mlir::success();
+	return builder.create<Operation>(location, type, operands[0], operands[1]);
 }
 
 mlir::Value SCADMIRLowering::scad_index(FFIHIRFunctionCall fc) {
