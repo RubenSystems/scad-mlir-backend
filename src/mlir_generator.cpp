@@ -229,6 +229,7 @@ mlir::LogicalResult SCADMIRLowering::scad_for(FFIHIRForLoop floop) {
 	);
 	std::string ivname(floop.iv.data, floop.iv.size);
 	variables[ivname] = loop.getInductionVar();
+	std::cout << ivname << "iv" << std::endl;
 
 	builder.setInsertionPointToStart(&loop.getRegion().front());
 	codegen(*floop.block);
@@ -336,9 +337,13 @@ mlir::Value SCADMIRLowering::scad_function_call(FFIHIRFunctionCall fc) {
 	// Codegen the operands first.
 	SmallVector<mlir::Value, 4> operands;
 	for (size_t i = 0; i < fc.param_len; i++) {
-		auto arg = codegen(fc.params[i]);
-		if (!arg)
+		auto parse_arg = fc.params[i];
+		auto arg = codegen(parse_arg);
+		if (!arg) {
+			std::cout << "unable to codegen arg " << i << " for "
+				  << fname << std::endl;
 			return nullptr;
+		}
 		operands.push_back(arg);
 	}
 
@@ -445,7 +450,7 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		return nullptr;
 	} else if (name == "@vec.load") {
 		return scad_vector_load_op(fc);
-	}else if (name.compare(0, 6, "@index") == 0) {
+	} else if (name.compare(0, 6, "@index") == 0) {
 		// Its an index op
 		return scad_index(fc);
 	} else if (name == "@drop") {
@@ -477,7 +482,6 @@ mlir::Value SCADMIRLowering::scad_scalar_op(FFIHIRFunctionCall fc) {
 	);
 }
 
-
 mlir::Value SCADMIRLowering::scad_vector_load_op(FFIHIRFunctionCall fc) {
 	SmallVector<mlir::Value, 4> operands;
 	for (size_t i = 0; i < fc.param_len; i++) {
@@ -489,54 +493,25 @@ mlir::Value SCADMIRLowering::scad_vector_load_op(FFIHIRFunctionCall fc) {
 		operands.push_back(arg);
 	}
 
-
-	auto size = llvm::cast<mlir::arith::ConstantIndexOp>(operands[2].getDefiningOp());
-	llvm::SmallVector<mlir::Value> load_ops = {
-		operands[1]
-	};
-	llvm::SmallVector<mlir::Type> res_type = {
-		mlir::VectorType::get(
-			{16},
-			llvm::cast<mlir::MemRefType>(operands[0].getType())
-				.getElementType()
-		)
+	auto size = llvm::cast<mlir::arith::ConstantIndexOp>(
+		operands[2].getDefiningOp()
+	);
+	llvm::SmallVector<mlir::Value> load_ops = { operands[1] };
+	llvm::SmallVector<mlir::Type> res_type = { mlir::VectorType::get(
+		{ size.value() },
+		llvm::cast<mlir::MemRefType>(operands[0].getType())
+			.getElementType()
+	)
 
 	};
 
-	return builder.create<mlir::vector::LoadOp>(mlir::UnknownLoc::get(&context), res_type, operands[0], load_ops);
-
-
-	// auto offset = llvm::cast<mlir::arith::ConstantIndexOp>(operands[1].getDefiningOp());
-
-	// auto size = builder.create<mlir::arith::IndexCastOp>(
-	// 	location, builder.getIndexType(), operands[2]
-	// );
-
-	// auto offset = builder.create<mlir::arith::IndexCastOp>(
-	// 	mlir::UnknownLoc::get(&context), builder.getIndexType(), 
-	// );
-
-
-	// llvm::SmallVector<mlir::Value> load_ops = {
-	// 	builder.create<mlir::arith::ConstantIndexOp>(mlir::UnknownLoc::get(&context), 0), 
-	// 	operands[1]
-	// };
-	// auto load_map = mlir::AffineMap::get(
-	// 	1, 1,  builder.getAffineDimExpr(0) + builder.getAffineSymbolExpr(0)
-	// );
-
-	// auto type = mlir::VectorType::get(
-	// 	{size.value()},
-	// 	llvm::cast<mlir::MemRefType>(operands[0].getType())
-	// 		.getElementType()
-	// );
-
-	// return builder.create<mlir::affine::AffineVectorLoadOp>(
-	// 	mlir::UnknownLoc::get(&context), type, operands[0], load_ops, load_map
-	// );
+	return builder.create<mlir::vector::LoadOp>(
+		mlir::UnknownLoc::get(&context), res_type, operands[0], load_ops
+	);
 }
 
-mlir::LogicalResult SCADMIRLowering::scad_vector_store_op(FFIHIRFunctionCall fc) {
+mlir::LogicalResult SCADMIRLowering::scad_vector_store_op(FFIHIRFunctionCall fc
+) {
 	SmallVector<mlir::Value, 4> operands;
 	for (size_t i = 0; i < fc.param_len; i++) {
 		auto arg = codegen(fc.params[i]);
@@ -547,8 +522,11 @@ mlir::LogicalResult SCADMIRLowering::scad_vector_store_op(FFIHIRFunctionCall fc)
 		operands.push_back(arg);
 	}
 
-	builder.create<mlir::affine::AffineVectorStoreOp>(
-		mlir::UnknownLoc::get(&context), operands[1]/*memref to store to*/, operands[0]/*vec to laod from*/, operands[2]/*Offset*/
+	builder.create<mlir::vector::StoreOp>(
+		mlir::UnknownLoc::get(&context),
+		operands[1] /*memref to store to*/,
+		operands[0] /*vec to laod from*/,
+		operands[2] /*Offset*/
 	);
 	return mlir::success();
 }
@@ -571,7 +549,9 @@ mlir::Value SCADMIRLowering::scad_vectorised_op(FFIHIRFunctionCall fc) {
 
 	auto type = operands[0].getType();
 
-	return builder.create<Operation>(location, type, operands[0], operands[1]);
+	return builder.create<Operation>(
+		location, type, operands[0], operands[1]
+	);
 }
 
 mlir::Value SCADMIRLowering::scad_index(FFIHIRFunctionCall fc) {
@@ -658,7 +638,6 @@ mlir::scad::FuncOp SCADMIRLowering::scad_func(FFIHIRFunctionDecl decl) {
 		// the function.
 		auto rettype = get_type_for(type.apps[type.size - 1]);
 
-		rettype.dump();
 		function.setType(builder.getFunctionType(
 			function.getFunctionType().getInputs(), rettype
 		));

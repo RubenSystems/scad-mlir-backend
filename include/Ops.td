@@ -149,9 +149,11 @@ def GenericCallOp : Scad_Op<"generic_call",
     [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "generic call operation";
 
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyTypeOf<[I32MemRef, I32]>>:$inputs);
+    Type AnyValue = AnyTypeOf<[I8, I16, I32, I64, Index, I8MemRef, I16MemRef, I32MemRef, I64MemRef]>;
 
-  let results = (outs AnyTypeOf<[I32MemRef, I32]>);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyValue>:$inputs);
+
+  let results = (outs AnyValue);
 
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)

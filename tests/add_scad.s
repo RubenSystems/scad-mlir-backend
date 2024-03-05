@@ -1,3 +1,7 @@
+# A program to add two numbers together. 
+# Considered trivial. Understanding will be left 
+# as an excersie to the reader.
+
 add:                                    # @add
         sub     rsp, 152
         mov     rax, -4

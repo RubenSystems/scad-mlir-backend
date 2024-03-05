@@ -135,12 +135,11 @@ int main(int argc, const char * argv[]) {
 		);
 		optPM.addPass(mlir::affine::createLoopUnrollPass());
 		// optPM.addPass(mlir::affine::createLoopTilingPass());
-		
+
 		optPM.addPass(mlir::affine::createAffineVectorize());
 		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass()
 		);
 		optPM.addPass(mlir::createLowerAffinePass());
-
 	}
 
 	std::cout << "\n\n\n";
