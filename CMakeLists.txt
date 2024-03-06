@@ -83,6 +83,7 @@ target_link_libraries(scadc
 		MLIRTargetLLVMIRExport
 		MLIRTransforms
 		MLIRAffineDialect
+		MLIRSCFDialect
 		MLIRArmSVEDialect
 		MLIRLinalgDialect
 		MLIRAffineTransforms

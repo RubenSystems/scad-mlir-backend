@@ -92,6 +92,12 @@ extern "C" {
 		const struct FFIHIRExpr * e2;
 	};
 
+	struct FFIHIRWhile {
+		struct FFIHIRValue condition;
+		const struct FFIHIRExpr * block;
+		const struct FFIHIRExpr * e2;
+	};
+
 	enum FFIHIRTag {
 		VariableDecl = 0,
 		Noop = 1,
@@ -99,7 +105,8 @@ extern "C" {
 		ForwardFunctionDecl = 3,
 		Return = 4,
 		Yield = 5,
-		For = 6
+		For = 6,
+		While = 7
 	};
 
 	struct FFIHIRVariableDecl {
@@ -137,6 +144,7 @@ extern "C" {
 		struct FFIHIRReturn ret;
 		struct FFIHIRYield yld;
 		struct FFIHIRForLoop floop;
+		struct FFIHIRWhile whl;
 	};
 
 	struct FFIHIRExpr {

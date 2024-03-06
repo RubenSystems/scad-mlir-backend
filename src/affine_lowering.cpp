@@ -17,6 +17,7 @@
 
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -43,22 +44,22 @@ static MemRefType convert_tensor_type_to_memref_type(RankedTensorType type) {
 	return MemRefType::get(type.getShape(), type.getElementType());
 }
 
-// using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddIOp>;
-struct AddOpLowering : public OpConversionPattern<scad::AddOp> {
-	using OpConversionPattern<scad::AddOp>::OpConversionPattern;
+// // using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddIOp>;
+// struct AddOpLowering : public OpConversionPattern<scad::AddOp> {
+// 	using OpConversionPattern<scad::AddOp>::OpConversionPattern;
 
-	LogicalResult matchAndRewrite(
-		scad::AddOp op,
-		OpAdaptor adaptor,
-		ConversionPatternRewriter & rewriter
-	) const final {
-		rewriter.replaceOpWithNewOp<arith::AddIOp>(
-			op, adaptor.getLhs(), adaptor.getRhs()
-		);
+// 	LogicalResult matchAndRewrite(
+// 		scad::AddOp op,
+// 		OpAdaptor adaptor,
+// 		ConversionPatternRewriter & rewriter
+// 	) const final {
+// 		rewriter.replaceOpWithNewOp<arith::AddIOp>(
+// 			op, adaptor.getLhs(), adaptor.getRhs()
+// 		);
 
-		return success();
-	}
-};
+// 		return success();
+// 	}
+// };
 
 struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 	using OpConversionPattern<scad::FuncOp>::OpConversionPattern;
@@ -112,29 +113,15 @@ struct ConditionalOpLowering : public OpConversionPattern<scad::ConditionalOp> {
 		mlir::scad::ConditionalOpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-		auto conditional_set = mlir::IntegerSet::get(
-			1, 0, rewriter.getAffineDimExpr(0) - 10, { false }
-
-		);
-
-		mlir::Type type = mlir::IntegerType::get(
-			rewriter.getContext(),
-			32,
-			mlir::IntegerType::SignednessSemantics::Signless
-		);
-
-		mlir::Value constant =
-			rewriter.create<mlir::arith::ConstantIndexOp>(
-				rewriter.getUnknownLoc(), 100
-			);
-
-		auto cond = rewriter.replaceOpWithNewOp<affine::AffineIfOp>(
+		op.dump();
+		std::cout << "here" << std::endl;
+		auto cond = rewriter.replaceOpWithNewOp<scf::IfOp>(
 			op,
-			MemRefType::get({ 2 }, rewriter.getI32Type()),
-			conditional_set,
-			constant,
+			rewriter.getI32Type(),
+			adaptor.getCondition(),
 			true
 		);
+
 
 		rewriter.inlineBlockBefore(
 			&adaptor.getIfArm().front(),
@@ -148,7 +135,8 @@ struct ConditionalOpLowering : public OpConversionPattern<scad::ConditionalOp> {
 			cond.getElseRegion().back().end()
 		);
 
-		// auto block = cond.getThenRegion().front();
+		cond.dump();
+
 
 		return success();
 	}
@@ -193,7 +181,7 @@ struct YieldOpLowering : public OpConversionPattern<scad::YieldOp> {
 		OpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-		rewriter.replaceOpWithNewOp<affine::AffineYieldOp>(
+		rewriter.replaceOpWithNewOp<scf::YieldOp>(
 			op, adaptor.getOperands()
 		);
 
@@ -278,8 +266,8 @@ void SCADToAffineLoweringPass::runOnOperation() {
 		arith::ArithDialect,
 		func::FuncDialect,
 		mlir::vector::VectorDialect,
-		mlir::arm_sve::ArmSVEDialect,
-		memref::MemRefDialect>();
+		memref::MemRefDialect,
+		scf::SCFDialect>();
 
 	target.addDynamicallyLegalOp<scad::PrintOp>([](scad::PrintOp op) {
 		return llvm::none_of(op->getOperandTypes(), [](Type type) {
@@ -292,7 +280,6 @@ void SCADToAffineLoweringPass::runOnOperation() {
 		.add<FuncOpLowering,
 		     ReturnOpLowering,
 		     CallOpLowering,
-		     AddOpLowering,
 		     ConditionalOpLowering,
 		     YieldOpLowering>(&getContext());
 

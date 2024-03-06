@@ -32,7 +32,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/TypeID.h"
 #include "mlir/IR/IntegerSet.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -118,6 +119,8 @@ class SCADMIRLowering {
 	mlir::MemRefType
 	create_memref_type(mlir::ArrayRef<int64_t> shape, mlir::Type type);
 
+	mlir::Value scad_cmp_op(FFIHIRFunctionCall fc, mlir::arith::CmpIPredicate comparitor);
+
 	mlir::Type get_type_for_int_width(uint32_t width);
 
 	mlir::Value scad_integer(FFIHIRInteger i);
@@ -129,6 +132,8 @@ class SCADMIRLowering {
 	mlir::LogicalResult scad_set(FFIHIRFunctionCall fc);
 
 	mlir::LogicalResult scad_for(FFIHIRForLoop floop);
+
+	mlir::LogicalResult scad_while(FFIHIRWhile whl);
 
 	mlir::LogicalResult scad_parallel(FFIHIRForLoop floop);
 

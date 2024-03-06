@@ -42,6 +42,8 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+
 
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/IR/Module.h"
@@ -93,8 +95,9 @@ int main(int argc, const char * argv[]) {
 	context.getOrLoadDialect<mlir::arith::ArithDialect>();
 	context.getOrLoadDialect<mlir::memref::MemRefDialect>();
 	context.getOrLoadDialect<mlir::affine::AffineDialect>();
-
 	context.getOrLoadDialect<mlir::vector::VectorDialect>();
+	context.getOrLoadDialect<mlir::scf::SCFDialect>();
+
 
 	SCADMIRLowering scad_lowerer(context, builder, mod, query_engine);
 	scad_lowerer.codegen(x);
@@ -139,7 +142,6 @@ int main(int argc, const char * argv[]) {
 		optPM.addPass(mlir::affine::createAffineVectorize());
 		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass()
 		);
-		optPM.addPass(mlir::createLowerAffinePass());
 	}
 
 	std::cout << "\n\n\n";

@@ -29,6 +29,9 @@ void SCADMIRLowering::codegen(FFIHIRExpr expression) {
 			scad_for(expression.value.floop);
 		}
 		break;
+	case While:
+		scad_while(expression.value.whl);
+		break;
 	default:
 		std::cout << " " << expression.tag
 			  << "what are you trying to do to me lol expr \n\n\n";
@@ -240,6 +243,31 @@ mlir::LogicalResult SCADMIRLowering::scad_for(FFIHIRForLoop floop) {
 	return mlir::success();
 }
 
+mlir::LogicalResult SCADMIRLowering::scad_while(FFIHIRWhile whl) {
+	mlir::Location location =
+		mlir::FileLineColLoc::get(&context, "while", 100, 100);
+
+	auto condition = codegen(whl.condition);
+
+	llvm::SmallVector<mlir::Value> ops = {condition}; 
+	llvm::SmallVector<mlir::Type> types;
+	auto loop = builder.create<mlir::scf::WhileOp>(location, types, ops, [&](mlir::OpBuilder & builder, mlir::Location loc, mlir::ValueRange cond){
+
+		builder.create<mlir::scf::ConditionOp>(loc, cond[0]);
+	}, [&](mlir::OpBuilder & builder, mlir::Location loc, mlir::ValueRange cond){
+		codegen(*whl.block);
+		auto condition = codegen(whl.condition);
+
+		llvm::SmallVector<mlir::Value> ops = {condition}; 
+
+		builder.create<mlir::scf::YieldOp>(loc, condition);
+	});
+
+	codegen(*whl.e2);
+
+	return mlir::success();
+}
+
 mlir::LogicalResult SCADMIRLowering::scad_parallel(FFIHIRForLoop floop) {
 	mlir::Location location =
 		mlir::FileLineColLoc::get(&context, "parallel", 100, 100);
@@ -361,16 +389,9 @@ mlir::Value SCADMIRLowering::scad_conditional(FFIHIRConditional cond) {
 		&context, std::string("cond"), 100, 100
 	);
 
-	auto bl = builder.create<mlir::scad::BoolOp>(
-		location,
-		mlir::IntegerType::get(
-			builder.getContext(),
-			1,
-			mlir::IntegerType::SignednessSemantics::Signless
-		),
-		true
-	);
-	auto scond = builder.create<mlir::scad::ConditionalOp>(location, bl);
+	auto condition = codegen(*cond.if_arm.condition);
+
+	auto scond = builder.create<mlir::scad::ConditionalOp>(location, condition, builder.getI32Type());
 
 	mlir::Block & if_arm = scond.getIfArm().front();
 	mlir::Block & else_arm = scond.getElseArm().front();
@@ -435,7 +456,17 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		return nullptr;
 	} else if (name == "@add") {
 		return scad_scalar_op<mlir::arith::AddIOp>(fc);
-	} else if (name == "@sub") {
+	} else if (name == "@lt") {
+		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::slt);
+	} else if (name == "@lte") {
+		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::sle);
+	} else if (name == "@eq") {
+		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::eq);
+	} else if (name == "@gte") {
+		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::sge);
+	} else if (name == "@gt") {
+		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::sgt);
+	}  else if (name == "@sub") {
 		return scad_scalar_op<mlir::arith::SubIOp>(fc);
 	} else if (name == "@mul") {
 		return scad_scalar_op<mlir::arith::MulIOp>(fc);
@@ -479,6 +510,24 @@ mlir::Value SCADMIRLowering::scad_scalar_op(FFIHIRFunctionCall fc) {
 
 	return builder.create<Operation>(
 		location, operands[0].getType(), operands[0], operands[1]
+	);
+}
+
+mlir::Value SCADMIRLowering::scad_cmp_op(FFIHIRFunctionCall fc, mlir::arith::CmpIPredicate comparitor) {
+	mlir::Location location =
+		mlir::FileLineColLoc::get(&context, "add_op", 100, 100);
+
+	// Codegen the operands first.
+	SmallVector<mlir::Value, 4> operands;
+	for (size_t i = 0; i < fc.param_len; i++) {
+		auto arg = codegen(fc.params[i]);
+		if (!arg)
+			return nullptr;
+		operands.push_back(arg);
+	}
+
+	return builder.create<mlir::arith::CmpIOp>(
+		location, builder.getI1Type(), comparitor, operands[0], operands[1]
 	);
 }
 
@@ -678,13 +727,14 @@ mlir::LogicalResult SCADMIRLowering::scad_yield(FFIHIRYield yld) {
 		&context, std::string("YIELD STATEMENT!!!"), 100, 100
 	);
 
-	std::string refer = std::string(
-		yld.res.value.variable_reference.name.data,
-		yld.res.value.variable_reference.name.size
-	);
+	// std::string refer = std::string(
+	// 	yld.res.value.variable_reference.name.data,
+	// 	yld.res.value.variable_reference.name.size
+	// );
+	auto ret_val = codegen(yld.res);
 
 	builder.create<mlir::scad::YieldOp>(
-		location, ArrayRef(variables[refer])
+		location, ArrayRef(ret_val)
 	);
 	return mlir::success();
 }

@@ -77,7 +77,8 @@ mlir::LogicalResult VectorOp::verify() {
 void ConditionalOp::build(
 	mlir::OpBuilder & builder,
 	mlir::OperationState & state,
-	mlir::Value cond
+	mlir::Value cond,
+	mlir::Type rettype
 ) {
 	state.addOperands(cond);
 	mlir::Region * if_region = state.addRegion();
@@ -88,7 +89,7 @@ void ConditionalOp::build(
 	mlir::Block * else_block = new Block();
 	else_region->push_back(else_block);
 
-	state.addTypes(RankedTensorType::get({ 2 }, builder.getI32Type()));
+	state.addTypes(rettype);
 }
 
 /*
@@ -201,15 +202,15 @@ MutableOperandRange GenericCallOp::getArgOperandsMutable() {
 Add Operation
 ===
 */
-void AddOp::build(
-	mlir::OpBuilder & builder,
-	mlir::OperationState & state,
-	mlir::Value lhs,
-	mlir::Value rhs
-) {
-	state.addTypes(UnrankedTensorType::get(builder.getI32Type()));
-	state.addOperands({ lhs, rhs });
-}
+// void AddOp::build(
+// 	mlir::OpBuilder & builder,
+// 	mlir::OperationState & state,
+// 	mlir::Value lhs,
+// 	mlir::Value rhs
+// ) {
+// 	state.addTypes(UnrankedTensorType::get(builder.getI32Type()));
+// 	state.addOperands({ lhs, rhs });
+// }
 
 // void DropOp::build(
 // 	mlir::OpBuilder & builder,

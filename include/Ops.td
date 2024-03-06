@@ -35,14 +35,7 @@ def VectorOp : Scad_Op<"vector", [Pure]> {
   ];
 }
 
-// DUMMY
-def BoolOp : Scad_Op<"bool", [Pure]> {
 
-
-  let arguments = (ins I1Attr:$value);
-  let results = (outs I1);
-
-}
 
 def FuncOp : Scad_Op<"fn", [
     FunctionOpInterface, IsolatedFromAbove
@@ -89,9 +82,9 @@ Conditional op
 def ConditionalOp : Scad_Op<"cond"> {
   let summary = "if this then that else that";
 
-
+  Type AnyValue = AnyTypeOf<[I1, I8, I16, I32, I64, Index, I1MemRef, I8MemRef, I16MemRef, I32MemRef, I64MemRef]>;
   let arguments = (ins I1:$condition);
-  let results = (outs I32Tensor);
+  let results = (outs AnyValue);
   let regions = (region
     AnyRegion:$if_arm,
     AnyRegion:$else_arm
@@ -100,7 +93,7 @@ def ConditionalOp : Scad_Op<"cond"> {
   // let hasCustomAssemblyFormat = 1;
 
   let builders = [
-    OpBuilder<(ins "Value":$condition)>
+    OpBuilder<(ins "Value":$condition, "Type":$rettype)>
   ];
 }
 
@@ -109,8 +102,9 @@ def ReturnOp : Scad_Op<"return", [Pure, HasParent<"FuncOp">,
                                  Terminator]> {
   let summary = "return operation";
 
+  Type AnyValue = AnyTypeOf<[I1, I8, I16, I32, I64, Index, I1MemRef, I8MemRef, I16MemRef, I32MemRef, I64MemRef]>;
 
-  let arguments = (ins Variadic<AnyTypeOf<[I8MemRef, I8, I16MemRef, I16, I32MemRef, I32, I64MemRef, I64]>>:$input);
+  let arguments = (ins Variadic<AnyValue>:$input);
 
   let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
 
@@ -129,8 +123,9 @@ def YieldOp : Scad_Op<"yield", [Pure, HasParent<"ConditionalOp">,
                                  Terminator]> {
   let summary = "yield operation to provide a value for a conditional";
 
+  Type AnyValue = AnyTypeOf<[I1, I8, I16, I32, I64, Index, I1MemRef, I8MemRef, I16MemRef, I32MemRef, I64MemRef]>;
 
-  let arguments = (ins Variadic<AnyTypeOf<[I32MemRef, I32]>>:$input);
+  let arguments = (ins Variadic<AnyValue>:$input);
 
   let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
 
@@ -149,7 +144,7 @@ def GenericCallOp : Scad_Op<"generic_call",
     [DeclareOpInterfaceMethods<CallOpInterface>]> {
   let summary = "generic call operation";
 
-    Type AnyValue = AnyTypeOf<[I8, I16, I32, I64, Index, I8MemRef, I16MemRef, I32MemRef, I64MemRef]>;
+    Type AnyValue = AnyTypeOf<[I1, I8, I16, I32, I64, Index, I1MemRef, I8MemRef, I16MemRef, I32MemRef, I64MemRef]>;
 
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyValue>:$inputs);
 
@@ -165,29 +160,26 @@ def GenericCallOp : Scad_Op<"generic_call",
 }
 
 def PrintOp : Scad_Op<"print"> {
-
-
   let arguments = (ins I32:$input);
-
   let assemblyFormat = "$input attr-dict `:` type($input)";
 }
 
 
-def AddOp : Scad_Op<"add",
-    [Pure]> {
-  let summary = "element-wise addition operation";
-  Type AnyInt = AnyTypeOf<[I8, I16, I32, I64]>;
-  let arguments = (ins AnyInt:$lhs, AnyInt:$rhs);
-  let results = (outs AnyInt);
+// def AddOp : Scad_Op<"add",
+//     [Pure]> {
+//   let summary = "element-wise addition operation";
+//   Type AnyInt = AnyTypeOf<[I8, I16, I32, I64]>;
+//   let arguments = (ins AnyInt:$lhs, AnyInt:$rhs);
+//   let results = (outs AnyInt);
 
-  // Indicate that the operation has a custom parser and printer method.
-  // let hasCustomAssemblyFormat = 1;
+//   // Indicate that the operation has a custom parser and printer method.
+//   // let hasCustomAssemblyFormat = 1;
 
-  // Allow building an AddOp with from the two input operands.
-  let builders = [
-    OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
-  ];
-}
+//   // Allow building an AddOp with from the two input operands.
+//   let builders = [
+//     OpBuilder<(ins "Value":$lhs, "Value":$rhs)>
+//   ];
+// }
 
 // def DropOp : Scad_Op<"drop"> {
 //   let summary = "deallocate";
@@ -200,24 +192,24 @@ def AddOp : Scad_Op<"add",
 //   // ];
 // }
 
-def IndexOp : Scad_Op<"index",
-    [Pure]> {
-  let summary = "Get element from tensor at index";
+// def IndexOp : Scad_Op<"index",
+//     [Pure]> {
+//   let summary = "Get element from tensor at index";
 
-  let arguments = (ins I32MemRef:$value, Index:$index);
-  let results = (outs I32);
+//   let arguments = (ins I32MemRef:$value, Index:$index);
+//   let results = (outs I32);
 
-  let builders = [
-    OpBuilder<(ins "Value":$value, "Value":$index)>
-  ];
+//   let builders = [
+//     OpBuilder<(ins "Value":$value, "Value":$index)>
+//   ];
 
-  // let builders = [
-  //       OpBuilder<(ins "DenseIntElementsAttr":$value, "DenseIntElementsAttr":$index), [{
-  //       build($_builder, $_state, value.getType(), value, index.getType(), index);
-  //     }]>,
+//   // let builders = [
+//   //       OpBuilder<(ins "DenseIntElementsAttr":$value, "DenseIntElementsAttr":$index), [{
+//   //       build($_builder, $_state, value.getType(), value, index.getType(), index);
+//   //     }]>,
 
-  // ];
-}
+//   // ];
+// }
 
 
 
