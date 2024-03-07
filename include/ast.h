@@ -94,6 +94,7 @@ extern "C" {
 
 	struct FFIHIRWhile {
 		struct FFIHIRValue condition;
+		const struct FFIHIRExpr * cond_expr;
 		const struct FFIHIRExpr * block;
 		const struct FFIHIRExpr * e2;
 	};

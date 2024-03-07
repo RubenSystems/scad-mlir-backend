@@ -213,7 +213,7 @@ int main(int argc, const char * argv[]) {
 
 	std::string command =
 		std::string(
-			"~/downloads/llvm-project/cbld/bin/llc -filetype=obj -o "
+			"llc -filetype=obj -o "
 		) +
 		argv[2] + std::string(" tmp.ll; rm tmp.ll");
 	int result = system(command.data());

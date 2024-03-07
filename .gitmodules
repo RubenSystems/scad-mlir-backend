@@ -1,0 +1,6 @@
+[submodule "llvm-project"]
+	path = llvm-project
+	url = https://github.com/llvm/llvm-project.git
+[submodule "scad-lang"]
+	path = scad-lang
+	url = https://github.com/RubenSystems/scad-lang.git

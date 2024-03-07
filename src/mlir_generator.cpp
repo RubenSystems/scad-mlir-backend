@@ -247,20 +247,23 @@ mlir::LogicalResult SCADMIRLowering::scad_while(FFIHIRWhile whl) {
 	mlir::Location location =
 		mlir::FileLineColLoc::get(&context, "while", 100, 100);
 
-	auto condition = codegen(whl.condition);
 
-	llvm::SmallVector<mlir::Value> ops = {condition}; 
+	llvm::SmallVector<mlir::Value> ops = {}; 
 	llvm::SmallVector<mlir::Type> types;
 	auto loop = builder.create<mlir::scf::WhileOp>(location, types, ops, [&](mlir::OpBuilder & builder, mlir::Location loc, mlir::ValueRange cond){
-
-		builder.create<mlir::scf::ConditionOp>(loc, cond[0]);
+		// Generate condition depends code
+		codegen(*whl.cond_expr);
+		// Generate condition
+		auto condition = codegen(whl.condition);
+		llvm::SmallVector<mlir::Value> ops = {}; 
+		builder.create<mlir::scf::ConditionOp>(loc, condition, ops);
 	}, [&](mlir::OpBuilder & builder, mlir::Location loc, mlir::ValueRange cond){
 		codegen(*whl.block);
-		auto condition = codegen(whl.condition);
 
-		llvm::SmallVector<mlir::Value> ops = {condition}; 
 
-		builder.create<mlir::scf::YieldOp>(loc, condition);
+		llvm::SmallVector<mlir::Value> ops = {}; 
+
+		builder.create<mlir::scf::YieldOp>(loc, ops);
 	});
 
 	codegen(*whl.e2);
