@@ -43,6 +43,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include <cstdlib>
 
 
 #include "llvm/Target/TargetMachine.h"
@@ -142,6 +143,8 @@ int main(int argc, const char * argv[]) {
 		optPM.addPass(mlir::affine::createAffineVectorize());
 		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass()
 		);
+		optPM.addPass(mlir::createLowerAffinePass()
+		);
 	}
 
 	std::cout << "\n\n\n";
@@ -210,10 +213,12 @@ int main(int argc, const char * argv[]) {
 	llvm::raw_fd_ostream ll_dest("tmp.ll", ec, llvm::sys::fs::OF_None);
 	ll_dest << *llvmModule;
 	llvm::errs() << *llvmModule << "\n";
+	const char * llc_path_env_name = "TRUNK_LLC_PATH";
+	char * value = std::getenv(llc_path_env_name);
 
 	std::string command =
-		std::string(
-			"llc -filetype=obj -o "
+		std::string(value) + std::string(
+			" -filetype=obj -o "
 		) +
 		argv[2] + std::string(" tmp.ll; rm tmp.ll");
 	int result = system(command.data());
