@@ -116,12 +116,8 @@ struct ConditionalOpLowering : public OpConversionPattern<scad::ConditionalOp> {
 		op.dump();
 		std::cout << "here" << std::endl;
 		auto cond = rewriter.replaceOpWithNewOp<scf::IfOp>(
-			op,
-			rewriter.getI32Type(),
-			adaptor.getCondition(),
-			true
+			op, rewriter.getI32Type(), adaptor.getCondition(), true
 		);
-
 
 		rewriter.inlineBlockBefore(
 			&adaptor.getIfArm().front(),
@@ -136,7 +132,6 @@ struct ConditionalOpLowering : public OpConversionPattern<scad::ConditionalOp> {
 		);
 
 		cond.dump();
-
 
 		return success();
 	}

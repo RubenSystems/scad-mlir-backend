@@ -45,7 +45,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include <cstdlib>
 
-
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetOptions.h"
@@ -99,7 +98,6 @@ int main(int argc, const char * argv[]) {
 	context.getOrLoadDialect<mlir::vector::VectorDialect>();
 	context.getOrLoadDialect<mlir::scf::SCFDialect>();
 
-
 	SCADMIRLowering scad_lowerer(context, builder, mod, query_engine);
 	scad_lowerer.codegen(x);
 
@@ -143,8 +141,7 @@ int main(int argc, const char * argv[]) {
 		optPM.addPass(mlir::affine::createAffineVectorize());
 		optPM.addPass(mlir::affine::createSimplifyAffineStructuresPass()
 		);
-		optPM.addPass(mlir::createLowerAffinePass()
-		);
+		optPM.addPass(mlir::createLowerAffinePass());
 	}
 
 	std::cout << "\n\n\n";
@@ -216,11 +213,9 @@ int main(int argc, const char * argv[]) {
 	const char * llc_path_env_name = "TRUNK_LLC_PATH";
 	char * value = std::getenv(llc_path_env_name);
 
-	std::string command =
-		std::string(value) + std::string(
-			" -filetype=obj -o "
-		) +
-		argv[2] + std::string(" tmp.ll; rm tmp.ll");
+	std::string command = std::string(value) +
+			      std::string(" -filetype=obj -o ") + argv[2] +
+			      std::string(" tmp.ll; rm tmp.ll");
 	int result = system(command.data());
 
 	return 0;

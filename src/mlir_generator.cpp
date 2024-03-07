@@ -226,9 +226,10 @@ mlir::LogicalResult SCADMIRLowering::scad_for(FFIHIRForLoop floop) {
 
 	auto start_point = floop.start.value.integer.value;
 	auto end_point = floop.end.value.integer.value;
+	auto step = floop.step.value.integer.value;
 
 	auto loop = builder.create<mlir::affine::AffineForOp>(
-		location, start_point, end_point, 1
+		location, start_point, end_point, step
 	);
 	std::string ivname(floop.iv.data, floop.iv.size);
 	variables[ivname] = loop.getInductionVar();
@@ -247,24 +248,34 @@ mlir::LogicalResult SCADMIRLowering::scad_while(FFIHIRWhile whl) {
 	mlir::Location location =
 		mlir::FileLineColLoc::get(&context, "while", 100, 100);
 
-
-	llvm::SmallVector<mlir::Value> ops = {}; 
+	llvm::SmallVector<mlir::Value> ops = {};
 	llvm::SmallVector<mlir::Type> types;
-	auto loop = builder.create<mlir::scf::WhileOp>(location, types, ops, [&](mlir::OpBuilder & builder, mlir::Location loc, mlir::ValueRange cond){
-		// Generate condition depends code
-		codegen(*whl.cond_expr);
-		// Generate condition
-		auto condition = codegen(whl.condition);
-		llvm::SmallVector<mlir::Value> ops = {}; 
-		builder.create<mlir::scf::ConditionOp>(loc, condition, ops);
-	}, [&](mlir::OpBuilder & builder, mlir::Location loc, mlir::ValueRange cond){
-		codegen(*whl.block);
+	auto loop = builder.create<mlir::scf::WhileOp>(
+		location,
+		types,
+		ops,
+		[&](mlir::OpBuilder & builder,
+		    mlir::Location loc,
+		    mlir::ValueRange cond) {
+			// Generate condition depends code
+			codegen(*whl.cond_expr);
+			// Generate condition
+			auto condition = codegen(whl.condition);
+			llvm::SmallVector<mlir::Value> ops = {};
+			builder.create<mlir::scf::ConditionOp>(
+				loc, condition, ops
+			);
+		},
+		[&](mlir::OpBuilder & builder,
+		    mlir::Location loc,
+		    mlir::ValueRange cond) {
+			codegen(*whl.block);
 
+			llvm::SmallVector<mlir::Value> ops = {};
 
-		llvm::SmallVector<mlir::Value> ops = {}; 
-
-		builder.create<mlir::scf::YieldOp>(loc, ops);
-	});
+			builder.create<mlir::scf::YieldOp>(loc, ops);
+		}
+	);
 
 	codegen(*whl.e2);
 
@@ -394,7 +405,9 @@ mlir::Value SCADMIRLowering::scad_conditional(FFIHIRConditional cond) {
 
 	auto condition = codegen(*cond.if_arm.condition);
 
-	auto scond = builder.create<mlir::scad::ConditionalOp>(location, condition, builder.getI32Type());
+	auto scond = builder.create<mlir::scad::ConditionalOp>(
+		location, condition, builder.getI32Type()
+	);
 
 	mlir::Block & if_arm = scond.getIfArm().front();
 	mlir::Block & else_arm = scond.getElseArm().front();
@@ -469,7 +482,7 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::sge);
 	} else if (name == "@gt") {
 		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::sgt);
-	}  else if (name == "@sub") {
+	} else if (name == "@sub") {
 		return scad_scalar_op<mlir::arith::SubIOp>(fc);
 	} else if (name == "@mul") {
 		return scad_scalar_op<mlir::arith::MulIOp>(fc);
@@ -516,7 +529,10 @@ mlir::Value SCADMIRLowering::scad_scalar_op(FFIHIRFunctionCall fc) {
 	);
 }
 
-mlir::Value SCADMIRLowering::scad_cmp_op(FFIHIRFunctionCall fc, mlir::arith::CmpIPredicate comparitor) {
+mlir::Value SCADMIRLowering::scad_cmp_op(
+	FFIHIRFunctionCall fc,
+	mlir::arith::CmpIPredicate comparitor
+) {
 	mlir::Location location =
 		mlir::FileLineColLoc::get(&context, "add_op", 100, 100);
 
@@ -530,7 +546,11 @@ mlir::Value SCADMIRLowering::scad_cmp_op(FFIHIRFunctionCall fc, mlir::arith::Cmp
 	}
 
 	return builder.create<mlir::arith::CmpIOp>(
-		location, builder.getI1Type(), comparitor, operands[0], operands[1]
+		location,
+		builder.getI1Type(),
+		comparitor,
+		operands[0],
+		operands[1]
 	);
 }
 
@@ -736,8 +756,6 @@ mlir::LogicalResult SCADMIRLowering::scad_yield(FFIHIRYield yld) {
 	// );
 	auto ret_val = codegen(yld.res);
 
-	builder.create<mlir::scad::YieldOp>(
-		location, ArrayRef(ret_val)
-	);
+	builder.create<mlir::scad::YieldOp>(location, ArrayRef(ret_val));
 	return mlir::success();
 }

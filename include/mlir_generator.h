@@ -34,7 +34,6 @@
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
-
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
@@ -119,7 +118,10 @@ class SCADMIRLowering {
 	mlir::MemRefType
 	create_memref_type(mlir::ArrayRef<int64_t> shape, mlir::Type type);
 
-	mlir::Value scad_cmp_op(FFIHIRFunctionCall fc, mlir::arith::CmpIPredicate comparitor);
+	mlir::Value scad_cmp_op(
+		FFIHIRFunctionCall fc,
+		mlir::arith::CmpIPredicate comparitor
+	);
 
 	mlir::Type get_type_for_int_width(uint32_t width);
 
