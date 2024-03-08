@@ -25,6 +25,18 @@ fn main() i32 {
 };
 ```
 
+if you want, you can unroll a loop for optimisation purposes: 
+```
+fn main() i32 {
+
+	for i: 0->100 unroll 10 {
+		@print(v: i -> i32);
+	};
+
+	0_i32
+};
+```
+
 SCaD also supports multithreading using its parallel for:
 ```
 fn main() i32 {
