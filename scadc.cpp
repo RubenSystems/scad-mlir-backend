@@ -135,7 +135,7 @@ int main(int argc, const char * argv[]) {
 		optPM.addPass(mlir::affine::createLoopFusionPass());
 		optPM.addPass(mlir::affine::createAffineScalarReplacementPass()
 		);
-		optPM.addPass(mlir::affine::createLoopUnrollPass());
+		// optPM.addPass(mlir::affine::createLoopUnrollPass());
 		// optPM.addPass(mlir::affine::createLoopTilingPass());
 
 		optPM.addPass(mlir::affine::createAffineVectorize());

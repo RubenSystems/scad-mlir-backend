@@ -50,6 +50,7 @@ mlir::Value SCADMIRLowering::codegen(FFIHIRValue value) {
 			value.value.variable_reference.name.data,
 			value.value.variable_reference.name.size
 		);
+		std::cout << variable_name << " ref" << std::endl;
 		return variables[variable_name];
 	}
 	case FunctionCall:
@@ -233,7 +234,7 @@ mlir::LogicalResult SCADMIRLowering::scad_for(FFIHIRForLoop floop) {
 	);
 	std::string ivname(floop.iv.data, floop.iv.size);
 	variables[ivname] = loop.getInductionVar();
-	std::cout << ivname << "iv" << std::endl;
+	std::cout << ivname << " iv" << std::endl;
 
 	builder.setInsertionPointToStart(&loop.getRegion().front());
 	codegen(*floop.block);
@@ -360,7 +361,7 @@ mlir::Value SCADMIRLowering::scad_constant(FFIHIRVariableDecl decl) {
 		alloc_flag.val = r;
 		allocations[name] = alloc_flag;
 	}
-
+	std::cout << name << " decl" << std::endl;
 	variables[name] = r;
 
 	codegen(*decl.e2);
