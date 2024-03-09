@@ -2,7 +2,7 @@
 
 SCaD is a programming language for speed and efficiency. 
 
-This is an entire compiler implementation so it can compiler your source code to machine code. 
+This is an entire compiler implementation so it can compile your source code to machine code. 
 
 Examples of scad: 
 
