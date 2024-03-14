@@ -2,7 +2,7 @@
 
 SCaD is a programming language for speed and efficiency. 
 
-This is an entire compiler implementation so it can compiler your source code to machine code. 
+This is an entire compiler implementation so it can compile your source code to machine code. 
 
 Examples of scad: 
 
@@ -18,6 +18,18 @@ fn main() i32 {
 fn main() i32 {
 
 	for i: 0->100 step 2 {
+		@print(v: i -> i32);
+	};
+
+	0_i32
+};
+```
+
+if you want, you can unroll a loop for optimisation purposes: 
+```
+fn main() i32 {
+
+	for i: 0->100 unroll 10 {
 		@print(v: i -> i32);
 	};
 
