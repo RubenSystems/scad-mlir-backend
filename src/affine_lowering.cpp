@@ -44,23 +44,6 @@ static MemRefType convert_tensor_type_to_memref_type(RankedTensorType type) {
 	return MemRefType::get(type.getShape(), type.getElementType());
 }
 
-// // using AddOpLowering = BinaryOpLowering<scad::AddOp, arith::AddIOp>;
-// struct AddOpLowering : public OpConversionPattern<scad::AddOp> {
-// 	using OpConversionPattern<scad::AddOp>::OpConversionPattern;
-
-// 	LogicalResult matchAndRewrite(
-// 		scad::AddOp op,
-// 		OpAdaptor adaptor,
-// 		ConversionPatternRewriter & rewriter
-// 	) const final {
-// 		rewriter.replaceOpWithNewOp<arith::AddIOp>(
-// 			op, adaptor.getLhs(), adaptor.getRhs()
-// 		);
-
-// 		return success();
-// 	}
-// };
-
 struct FuncOpLowering : public OpConversionPattern<scad::FuncOp> {
 	using OpConversionPattern<scad::FuncOp>::OpConversionPattern;
 
@@ -113,10 +96,9 @@ struct ConditionalOpLowering : public OpConversionPattern<scad::ConditionalOp> {
 		mlir::scad::ConditionalOpAdaptor adaptor,
 		ConversionPatternRewriter & rewriter
 	) const final {
-		op.dump();
-		std::cout << "here" << std::endl;
+		auto res_type = *op->result_type_begin();
 		auto cond = rewriter.replaceOpWithNewOp<scf::IfOp>(
-			op, rewriter.getI32Type(), adaptor.getCondition(), true
+			op, res_type, adaptor.getCondition(), true
 		);
 
 		rewriter.inlineBlockBefore(
@@ -136,21 +118,6 @@ struct ConditionalOpLowering : public OpConversionPattern<scad::ConditionalOp> {
 		return success();
 	}
 };
-
-// struct PrintOpLowering : public OpConversionPattern<scad::PrintOp> {
-// 	using OpConversionPattern<scad::PrintOp>::OpConversionPattern;
-
-// 	LogicalResult matchAndRewrite(
-// 		scad::PrintOp op,
-// 		OpAdaptor adaptor,
-// 		ConversionPatternRewriter & rewriter
-// 	) const final {
-// 		rewriter.modifyOpInPlace(op, [&] {
-// 			op->setOperands(adaptor.getOperands());
-// 		});
-// 		return success();
-// 	}
-// };
 
 struct ReturnOpLowering : public OpConversionPattern<scad::ReturnOp> {
 	using OpConversionPattern<scad::ReturnOp>::OpConversionPattern;
@@ -183,29 +150,6 @@ struct YieldOpLowering : public OpConversionPattern<scad::YieldOp> {
 		return success();
 	}
 };
-
-// struct IndexOpLowering : public OpConversionPattern<scad::IndexOp> {
-// 	using OpConversionPattern<scad::IndexOp>::OpConversionPattern;
-
-// 	LogicalResult matchAndRewrite(
-// 		scad::IndexOp op,
-// 		OpAdaptor adaptor,
-// 		ConversionPatternRewriter & rewriter
-// 	) const final {
-// 		auto memRefType = op.getValue().getType();
-// 		SmallVector<Value, 8> constant_indicies;
-// 		// constant_indicies.push_back(
-// 		// 	rewriter.create<arith::ConstantIndexOp>(
-// 		// 		op.getLoc(), op.getODSOperands(1)
-// 		// 	)
-// 		// );
-// 		auto memRef = rewriter.replaceOpWithNewOp<affine::AffineLoadOp>(
-// 			op, adaptor.getValue(), op.getODSOperands(1)
-// 		);
-
-// 		return success();
-// 	}
-// };
 
 struct CallOpLowering : public OpConversionPattern<mlir::scad::GenericCallOp> {
 	using OpConversionPattern<mlir::scad::GenericCallOp>::OpConversionPattern;

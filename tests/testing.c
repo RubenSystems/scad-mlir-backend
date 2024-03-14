@@ -8,8 +8,7 @@
 #define SIZE 128
 
 // extern "C" {
-int32_t add(SCAD_ARRAY_DEF(int32_t), SCAD_ARRAY_DEF(int32_t), SCAD_ARRAY_DEF(int32_t));
-// }
+ // }
 
 
 __attribute__((noinline))

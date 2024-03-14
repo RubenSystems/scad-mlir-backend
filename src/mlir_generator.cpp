@@ -361,7 +361,6 @@ mlir::Value SCADMIRLowering::scad_constant(FFIHIRVariableDecl decl) {
 		alloc_flag.val = r;
 		allocations[name] = alloc_flag;
 	}
-	std::cout << name << " decl" << std::endl;
 	variables[name] = r;
 
 	codegen(*decl.e2);
@@ -473,6 +472,8 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		return nullptr;
 	} else if (name == "@add") {
 		return scad_scalar_op<mlir::arith::AddIOp>(fc);
+	} else if (name == "@div") {
+		return scad_scalar_op<mlir::arith::DivSIOp>(fc);
 	} else if (name == "@lt") {
 		return scad_cmp_op(fc, mlir::arith::CmpIPredicate::slt);
 	} else if (name == "@lte") {
@@ -496,6 +497,8 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 	} else if (name == "@vec.store") {
 		scad_vector_store_op(fc);
 		return nullptr;
+	} else if (name == "@empty") {
+		return scad_empty(fc);
 	} else if (name == "@vec.load") {
 		return scad_vector_load_op(fc);
 	} else if (name.compare(0, 6, "@index") == 0) {
@@ -509,6 +512,48 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		scad_set(fc);
 		return nullptr;
 	}
+}
+
+mlir::Value SCADMIRLowering::scad_empty(FFIHIRFunctionCall fc) {
+	mlir::Location location =
+		mlir::FileLineColLoc::get(&context, "add_op", 100, 100);
+
+	// Codegen the operands first.
+	SmallVector<mlir::Value, 4> operands;
+	for (size_t i = 0; i < fc.param_len; i++) {
+		auto arg = codegen(fc.params[i]);
+		if (!arg)
+			return nullptr;
+		operands.push_back(arg);
+	}
+	auto size = llvm::cast<mlir::arith::ConstantIndexOp>(
+		operands[1].getDefiningOp()
+	);
+
+	auto splat = builder.create<mlir::vector::SplatOp>(
+		location,
+		mlir::VectorType::get({ size.value() }, operands[0].getType()),
+		operands[0]
+	);
+
+	auto alloc = builder.create<mlir::memref::AllocOp>(
+		location,
+		create_memref_type({ size.value() }, operands[0].getType())
+	);
+
+	llvm::SmallVector<mlir::Value> offset = {
+		builder.create<mlir::arith::ConstantIndexOp>(
+			mlir::UnknownLoc::get(&context), 0
+		)
+	};
+	builder.create<mlir::vector::StoreOp>(
+		mlir::UnknownLoc::get(&context),
+		splat /*vec to laod from*/,
+		alloc /*memref to store to*/,
+		offset /*Offset*/
+	);
+
+	return alloc;
 }
 
 template <typename Operation>
@@ -567,7 +612,7 @@ mlir::Value SCADMIRLowering::scad_vector_load_op(FFIHIRFunctionCall fc) {
 	}
 
 	auto size = llvm::cast<mlir::arith::ConstantIndexOp>(
-		operands[2].getDefiningOp()
+		operands[1].getDefiningOp()
 	);
 	llvm::SmallVector<mlir::Value> load_ops = { operands[1] };
 	llvm::SmallVector<mlir::Type> res_type = { mlir::VectorType::get(

@@ -131,6 +131,8 @@ class SCADMIRLowering {
 
 	mlir::Value scad_vector(FFIHIRTensor arr);
 
+	mlir::Value scad_empty(FFIHIRFunctionCall arr);
+
 	mlir::LogicalResult scad_set(FFIHIRFunctionCall fc);
 
 	mlir::LogicalResult scad_for(FFIHIRForLoop floop);
