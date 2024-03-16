@@ -192,7 +192,7 @@ mlir::Value SCADMIRLowering::scad_vector(FFIHIRTensor arr) {
 		indices.push_back(builder.create<mlir::arith::ConstantIndexOp>(
 			location, i
 		));
-		builder.create<mlir::affine::AffineStoreOp>(
+		builder.create<mlir::memref::StoreOp>(
 			location, values[i], alloc, llvm::ArrayRef(indices)
 		);
 	}
@@ -225,11 +225,11 @@ mlir::LogicalResult SCADMIRLowering::scad_for(FFIHIRForLoop floop) {
 	mlir::Location location =
 		mlir::FileLineColLoc::get(&context, "for", 100, 100);
 
-	auto start_point = floop.start.value.integer.value;
-	auto end_point = floop.end.value.integer.value;
-	auto step = floop.step.value.integer.value;
+	auto start_point = codegen(floop.start);
+	auto end_point = codegen(floop.end);
+	auto step = codegen(floop.step);
 
-	auto loop = builder.create<mlir::affine::AffineForOp>(
+	auto loop = builder.create<mlir::scf::ForOp>(
 		location, start_point, end_point, step
 	);
 	std::string ivname(floop.iv.data, floop.iv.size);
@@ -683,7 +683,7 @@ mlir::Value SCADMIRLowering::scad_index(FFIHIRFunctionCall fc) {
 	SmallVector<mlir::Value, 4> indicies;
 	indicies.push_back(index);
 
-	return builder.create<mlir::affine::AffineLoadOp>(
+	return builder.create<mlir::memref::LoadOp>(
 		location, array, indicies
 	);
 }

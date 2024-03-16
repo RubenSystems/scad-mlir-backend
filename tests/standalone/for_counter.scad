@@ -1,6 +1,6 @@
 fn main() i32 {
 
-	for i: 0->100 {
+	for i: 0_ii->100_ii {
 		@print(v: i -> i32);
 	};
 

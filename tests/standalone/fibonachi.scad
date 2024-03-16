@@ -2,7 +2,7 @@ fn main() i32 {
 
 	let sto = {1_i32, 1_i32}; 
 
-	for i: 0->17 {
+	for i: 0_ii->17_ii {
 		let a = @index.i32(c: sto, idx: 0_ii);
 		let b = @index.i32(c: sto, idx: 1_ii);
 
