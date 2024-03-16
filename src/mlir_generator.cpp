@@ -214,7 +214,7 @@ mlir::LogicalResult SCADMIRLowering::scad_set(FFIHIRFunctionCall fc) {
 
 	indices.push_back(index);
 
-	builder.create<mlir::affine::AffineStoreOp>(
+	builder.create<mlir::memref::StoreOp>(
 		location, value, array, llvm::ArrayRef(indices)
 	);
 

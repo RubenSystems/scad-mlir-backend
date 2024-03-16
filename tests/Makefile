@@ -43,5 +43,5 @@ standalone_tests: $(FINAL_STANDALONE)
 remove_standalone_tests: 
 	rm -f $(STANDALONE_TEST_RESULTS)
 
-clean: remove_standalone_tests
+clean:
 	rm -f $(STANDALONE_OBJS) $(FINAL_STANDALONE) 
