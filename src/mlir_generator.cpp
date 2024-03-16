@@ -683,9 +683,7 @@ mlir::Value SCADMIRLowering::scad_index(FFIHIRFunctionCall fc) {
 	SmallVector<mlir::Value, 4> indicies;
 	indicies.push_back(index);
 
-	return builder.create<mlir::memref::LoadOp>(
-		location, array, indicies
-	);
+	return builder.create<mlir::memref::LoadOp>(location, array, indicies);
 }
 
 mlir::scad::FuncOp
