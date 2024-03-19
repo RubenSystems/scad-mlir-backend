@@ -40,7 +40,7 @@ standalone_tests: $(FINAL_STANDALONE)
 		fi \
 	done
 
-remove_standalone_tests: 
+reset: 
 	rm -f $(STANDALONE_TEST_RESULTS)
 
 clean:

@@ -100,6 +100,7 @@ class SCADMIRLowering {
 	std::unordered_map<std::string, mlir::Type> function_results;
 	std::unordered_map<std::string, mlir::Value> variables;
 
+	// Liveness analysis
 	std::unordered_map<std::string, Alloc> allocations;
 
     private:

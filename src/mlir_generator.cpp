@@ -355,12 +355,12 @@ mlir::Value SCADMIRLowering::scad_constant(FFIHIRVariableDecl decl) {
 	// );
 	auto r = codegen(decl.e1);
 
-	if (decl.e1.tag == Tensor) {
-		Alloc alloc_flag;
-		alloc_flag.freed = false;
-		alloc_flag.val = r;
-		allocations[name] = alloc_flag;
-	}
+	// if (decl.e1.tag == Tensor) {
+	// 	Alloc alloc_flag;
+	// 	alloc_flag.freed = false;
+	// 	alloc_flag.val = r;
+	// 	allocations[name] = alloc_flag;
+	// }
 	variables[name] = r;
 
 	codegen(*decl.e2);
@@ -441,21 +441,11 @@ mlir::LogicalResult SCADMIRLowering::scad_drop(FFIHIRFunctionCall fc) {
 		&context, std::string("dropop"), 100, 100
 	);
 	// Currently drop assumes a variable reference.
-	// auto arg = codegen(fc.params[0]);
+	auto arg = codegen(fc.params[0]);
 
-	std::string vrname(
-		fc.params[0].value.variable_reference.name.data,
-		fc.params[0].value.variable_reference.name.size
-	);
-	if (allocations.find(vrname) != allocations.end()) {
-		Alloc & alloced = allocations[vrname];
-		if (!alloced.freed) {
-			// builder.create<mlir::scad::DropOp>(location, alloced.val);
-			builder.create<mlir::memref::DeallocOp>(
-				location, alloced.val
-			);
-			alloced.freed = true;
-		}
+	auto type = arg.getType();
+	if (mlir::MemRefType memRefType = type.dyn_cast_or_null<mlir::MemRefType>()) {
+		builder.create<mlir::memref::DeallocOp>(location, arg);
 	}
 
 	return mlir::success();
