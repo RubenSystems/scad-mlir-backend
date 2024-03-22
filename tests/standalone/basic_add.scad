@@ -1,7 +1,14 @@
 fn main() i32 {
 	
-	@print(value: @add(a: 100_i32, b: 200_i32));
+	
+	let a = 1_i32; 
+	let b = @add(a: a, b: 1_i32);
+	let c = @add(a: b, b: 1_i32);
+
+
+	@print(value: c);
+
+
 	0_i32
 };
-
 

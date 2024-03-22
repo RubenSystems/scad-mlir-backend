@@ -484,6 +484,12 @@ SCADMIRLowering::inbuilt_op(std::string & name, FFIHIRFunctionCall fc) {
 		return scad_vectorised_op<mlir::arith::SubIOp>(fc);
 	} else if (name == "@mul.v") {
 		return scad_vectorised_op<mlir::arith::MulIOp>(fc);
+	} else if (name == "@prefetch.read") {
+		scad_prefetch_read(fc);
+		return nullptr;
+	} else if (name == "@prefetch.write") {
+		scad_prefetch_write(fc);
+		return nullptr;
 	} else if (name == "@vec.store") {
 		scad_vector_store_op(fc);
 		return nullptr;
@@ -602,7 +608,7 @@ mlir::Value SCADMIRLowering::scad_vector_load_op(FFIHIRFunctionCall fc) {
 	}
 
 	auto size = llvm::cast<mlir::arith::ConstantIndexOp>(
-		operands[1].getDefiningOp()
+		operands[2].getDefiningOp()
 	);
 	llvm::SmallVector<mlir::Value> load_ops = { operands[1] };
 	llvm::SmallVector<mlir::Type> res_type = { mlir::VectorType::get(
@@ -675,6 +681,41 @@ mlir::Value SCADMIRLowering::scad_index(FFIHIRFunctionCall fc) {
 
 	return builder.create<mlir::memref::LoadOp>(location, array, indicies);
 }
+
+mlir::LogicalResult SCADMIRLowering::scad_prefetch_read(FFIHIRFunctionCall fc) {
+	mlir::Location location =
+		mlir::FileLineColLoc::get(&context, "index_op", 100, 100);
+
+	// Codegen the operands first.
+	auto memref = codegen(fc.params[0]);
+	auto start = codegen(fc.params[1]);
+	auto end = codegen(fc.params[2]);
+
+	SmallVector<mlir::Value, 4> indicies;
+	indicies.push_back(start);
+	// indicies.push_back(end);
+
+	builder.create<mlir::memref::PrefetchOp>(location, memref, indicies, false, 3, true);
+	return mlir::success();
+}
+
+mlir::LogicalResult SCADMIRLowering::scad_prefetch_write(FFIHIRFunctionCall fc) {
+	mlir::Location location =
+		mlir::FileLineColLoc::get(&context, "index_op", 100, 100);
+
+	// Codegen the operands first.
+	auto memref = codegen(fc.params[0]);
+	auto start = codegen(fc.params[1]);
+	auto end = codegen(fc.params[2]);
+
+	SmallVector<mlir::Value, 4> indicies;
+	indicies.push_back(start);
+	// indicies.push_back(end);
+
+	builder.create<mlir::memref::PrefetchOp>(location, memref, indicies, true, 3, true);
+	return mlir::success();
+}
+
 
 mlir::scad::FuncOp
 SCADMIRLowering::proto_gen(FFIHIRFunctionDecl ffd, FFIType function_type) {

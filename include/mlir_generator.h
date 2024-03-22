@@ -167,6 +167,9 @@ class SCADMIRLowering {
 
 	mlir::Value scad_index(FFIHIRFunctionCall fc);
 
+	mlir::LogicalResult scad_prefetch_read(FFIHIRFunctionCall fc);
+	mlir::LogicalResult scad_prefetch_write(FFIHIRFunctionCall fc);
+
 	mlir::scad::FuncOp
 	proto_gen(FFIHIRFunctionDecl ffd, FFIType function_type);
 
