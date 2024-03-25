@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define SCAD_ARRAY(pointer, size) pointer, pointer, 0, size, 1
-#define SCAD_ARRAY_DEF(type) type *, type *, int64_t, int64_t, int64_t
-#define SIZE 128
+#include "c_glue.h"
 
-// extern "C" {
- // }
+#define SIZE 1024
+
+
+int32_t add(SCAD_ARRAY_DEF(int32_t), SCAD_ARRAY_DEF(int32_t), SCAD_ARRAY_DEF(int32_t));
 
 
 __attribute__((noinline))
@@ -33,6 +33,7 @@ int32_t main() {
 		b[i] = i;
 		c[i] = 0;
 	}
+	
 
 
 	int32_t add_res = add(SCAD_ARRAY(a, SIZE), SCAD_ARRAY(b, SIZE), SCAD_ARRAY(c, SIZE));

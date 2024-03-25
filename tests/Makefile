@@ -7,6 +7,12 @@ STANDALONE_OBJS := $(STANDALONE_SRCS:.scad=.o)
 FINAL_STANDALONE := $(STANDALONE_OBJS:.o=)
 STANDALONE_TEST_RESULTS := $(STANDALONE_OBJS:.o=.txt)
 
+HOSTED_SRCS := $(wildcard hosted/*.scad)
+HOSTED_C_SRCS := $(wildcard hosted/*.c)
+HOSTED_BUILD_RESULTS := $(HOSTED_SRCS:.scad=.scadout)
+
+
+
 .PHONY: all clean
 
 all: standalone_tests
@@ -16,6 +22,11 @@ all: standalone_tests
 
 %.o: %.scad
 	../build/bin/scadc $< $@
+
+%.c: %.o
+	$(CC) -O3 $@ -o $*.scadout $<
+
+hosted: $(HOSTED_C_SRCS)
 
 test_standalone: $(FINAL_STANDALONE)
 	@for exe in $(FINAL_STANDALONE); do \
@@ -29,6 +40,7 @@ test_standalone: $(FINAL_STANDALONE)
 		rm $$exe.out;\
 	done
 
+
 standalone_tests: $(FINAL_STANDALONE)
 	@for exe in $(FINAL_STANDALONE); do \
 		if [ ! -f $$exe.txt ]; then \
@@ -40,8 +52,11 @@ standalone_tests: $(FINAL_STANDALONE)
 		fi \
 	done
 
+
+
+
 reset: 
-	rm -f $(STANDALONE_TEST_RESULTS)
+	rm -f $(STANDALONE_TEST_RESULTS) 
 
 clean:
-	rm -f $(STANDALONE_OBJS) $(FINAL_STANDALONE) 
+	rm -f $(STANDALONE_OBJS) $(FINAL_STANDALONE) $(HOSTED_BUILD_RESULTS)

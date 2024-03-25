@@ -13,7 +13,7 @@ fn dot(a: 4xi32, b: 4xi32) 4xi32 {
 	for i: 0_ii -> 2_ii {
 		for j: 0_ii -> 2_ii {
 			for k: 0_ii -> 2_ii {
-				let res = @mul(a: get(container: a, r: i, c: k), b: get(container: a, r: k, c: j));
+				let res = @mul(a: get(container: a, r: i, c: k), b: get(container: b, r: k, c: j));
 				let existing = @index.i32(container: result, idx: idx(r: i, c: j));
 
 				@set.i32(container: result, index: idx(r: i, c: j), value: @add(a: res, b: existing));

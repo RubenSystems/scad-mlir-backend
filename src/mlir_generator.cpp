@@ -444,7 +444,8 @@ mlir::LogicalResult SCADMIRLowering::scad_drop(FFIHIRFunctionCall fc) {
 	auto arg = codegen(fc.params[0]);
 
 	auto type = arg.getType();
-	if (mlir::MemRefType memRefType = type.dyn_cast_or_null<mlir::MemRefType>()) {
+	if (mlir::MemRefType memRefType =
+		    type.dyn_cast_or_null<mlir::MemRefType>()) {
 		builder.create<mlir::memref::DeallocOp>(location, arg);
 	}
 
@@ -695,11 +696,14 @@ mlir::LogicalResult SCADMIRLowering::scad_prefetch_read(FFIHIRFunctionCall fc) {
 	indicies.push_back(start);
 	// indicies.push_back(end);
 
-	builder.create<mlir::memref::PrefetchOp>(location, memref, indicies, false, 3, true);
+	builder.create<mlir::memref::PrefetchOp>(
+		location, memref, indicies, false, 2, true
+	);
 	return mlir::success();
 }
 
-mlir::LogicalResult SCADMIRLowering::scad_prefetch_write(FFIHIRFunctionCall fc) {
+mlir::LogicalResult SCADMIRLowering::scad_prefetch_write(FFIHIRFunctionCall fc
+) {
 	mlir::Location location =
 		mlir::FileLineColLoc::get(&context, "index_op", 100, 100);
 
@@ -712,10 +716,11 @@ mlir::LogicalResult SCADMIRLowering::scad_prefetch_write(FFIHIRFunctionCall fc) 
 	indicies.push_back(start);
 	// indicies.push_back(end);
 
-	builder.create<mlir::memref::PrefetchOp>(location, memref, indicies, true, 3, true);
+	builder.create<mlir::memref::PrefetchOp>(
+		location, memref, indicies, true, 2, true
+	);
 	return mlir::success();
 }
-
 
 mlir::scad::FuncOp
 SCADMIRLowering::proto_gen(FFIHIRFunctionDecl ffd, FFIType function_type) {
